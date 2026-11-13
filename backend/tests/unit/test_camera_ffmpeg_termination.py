@@ -253,7 +253,7 @@ async def test_rtsp_stream_reconnects_past_unreaped_ffmpeg(monkeypatch):
         spawned.append(process)
         return process
 
-    async def fake_create_tls_proxy(_ip_address: str, _port: int):
+    async def fake_create_tls_proxy(_ip_address: str, _port: int, _ssl_ctx=None):
         return 48521, _FakeServer()
 
     monkeypatch.setattr(camera, "get_ffmpeg_path", lambda: "/fake/ffmpeg")

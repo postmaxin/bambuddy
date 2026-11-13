@@ -72,7 +72,7 @@ def rtsp(monkeypatch):
         spawned.append(frames)
         return _Proc(frames)
 
-    async def _fake_proxy(_ip: str, _port: int):
+    async def _fake_proxy(_ip: str, _port: int, _ssl_ctx=None):
         return 48998, _FakeServer()
 
     async def _recording_sleep(seconds, *args, **kwargs):

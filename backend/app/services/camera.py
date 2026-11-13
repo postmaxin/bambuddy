@@ -18,6 +18,7 @@ import weakref
 from datetime import datetime
 from pathlib import Path
 
+from backend.app.services.printer_tls import printer_ssl_context
 from backend.app.utils.ffmpeg_output import (
     FFMPEG_RTSP_LOGLEVEL,
     NO_FFMPEG_OUTPUT,
@@ -244,7 +245,9 @@ def rewrite_rtsp_request_url(data: bytes, proxy_url: bytes, real_url: bytes) -> 
     return b"\r\n".join(lines)
 
 
-async def create_tls_proxy(target_host: str, target_port: int) -> tuple[int, "asyncio.Server"]:
+async def create_tls_proxy(
+    target_host: str, target_port: int, ssl_ctx: ssl.SSLContext | None = None
+) -> tuple[int, "asyncio.Server"]:
     """Create a local TCP→TLS proxy for RTSP streams.
 
     Bambu printers use RTSPS (RTSP over TLS) with self-signed certificates.
@@ -261,12 +264,19 @@ async def create_tls_proxy(target_host: str, target_port: int) -> tuple[int, "as
     rewrites ``127.0.0.1:<proxy_port>`` → ``<target_host>:<target_port>`` in
     client→server data so the printer recognises the stream path.
 
+    ``ssl_ctx`` verifies the upstream: printer cameras pass
+    :func:`~backend.app.services.printer_tls.printer_ssl_context`, so ffmpeg's
+    ``bblp:<access code>`` credentials only reach a verified printer. Without
+    it (external cameras) the upstream is not verified.
+
     Returns ``(local_port, server)``.  Caller must close it with
     :func:`close_tls_proxy` when done.
     """
-    ssl_ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
-    ssl_ctx.check_hostname = False
-    ssl_ctx.verify_mode = ssl.CERT_NONE
+    if ssl_ctx is None:
+        # External cameras: no verification, as before.
+        ssl_ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+        ssl_ctx.check_hostname = False
+        ssl_ctx.verify_mode = ssl.CERT_NONE
 
     # Filled in after the server socket is created (handler only runs after).
     _local_port: list[int] = [0]
@@ -441,12 +451,9 @@ def _create_chamber_auth_payload(access_code: str) -> bytes:
 def _create_ssl_context() -> ssl.SSLContext:
     """Create an SSL context for chamber image connection.
 
-    Bambu printers use self-signed certificates, so we disable verification.
+    The printer is verified before the access code goes out (see printer_tls).
     """
-    ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
-    ctx.check_hostname = False
-    ctx.verify_mode = ssl.CERT_NONE
-    return ctx
+    return printer_ssl_context()
 
 
 async def read_chamber_image_frame(
@@ -767,7 +774,7 @@ async def _capture_camera_frame_bytes_uncoalesced(
     # RTSP models: X1/H2/P2 - use ffmpeg piping to stdout
     # TLS proxy avoids GnuTLS compatibility issues with some printer firmwares
     port = get_camera_port(model)
-    proxy_port, proxy_server = await create_tls_proxy(ip_address, port)
+    proxy_port, proxy_server = await create_tls_proxy(ip_address, port, printer_ssl_context())
     camera_url = f"rtsp://bblp:{access_code}@127.0.0.1:{proxy_port}/streaming/live/1"
 
     ffmpeg = get_ffmpeg_path()

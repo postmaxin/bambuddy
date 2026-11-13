@@ -7788,6 +7788,7 @@ export default {
         pass: 'Raggiungibile — l\'invio dei file di stampa funzionerà.',
         warn: 'La porta 990 non è raggiungibile. Il monitoraggio potrebbe ancora funzionare, ma l\'invio delle stampe alla stampante fallirà. Assicurati che la porta 990 non sia bloccata.',
         warn_no_tls: 'La porta 990 è aperta, ma il servizio file della stampante non completa l\'handshake TLS. I file di stampa, le anteprime e i timelapse non possono essere scaricati, quindi gli archivi restano vuoti. Riavvia la stampante — sbloccare la porta non serve.',
+        warn_untrusted_cert: 'La porta 990 ha risposto, ma non è stato possibile verificare il certificato TLS della stampante, quindi Bambuddy non le ha inviato il codice di accesso. Il log del server indica quale controllo non è riuscito. Se è la tua stampante, il suo modello potrebbe usare un\'autorità di certificazione che Bambuddy non conosce ancora (vedi l\'impostazione PRINTER_TLS_VERIFY).',
       },
       external_storage: {
         title: 'Memorizza file inviati su archiviazione esterna (passo 4 dell\'installazione)',

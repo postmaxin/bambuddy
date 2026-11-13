@@ -7809,6 +7809,7 @@ export default {
         pass: 'Accesible — el envío de archivos de impresión funcionará.',
         warn: 'El puerto 990 no es accesible. La supervisión puede seguir funcionando, pero el envío de impresiones a la impresora fallará. Asegúrese de que el puerto 990 no esté bloqueado.',
         warn_no_tls: 'El puerto 990 está abierto, pero el servicio de archivos de la impresora no completa el protocolo de enlace TLS. No se pueden obtener los archivos de impresión, las portadas ni los timelapses, por lo que los archivos quedan vacíos. Reinicie la impresora — desbloquear el puerto no servirá.',
+        warn_untrusted_cert: 'El puerto 990 respondió, pero no se pudo verificar el certificado TLS de la impresora, así que Bambuddy no le envió el código de acceso. El registro del servidor indica qué comprobación falló. Si es su impresora, puede que su modelo use una autoridad de certificación que Bambuddy aún no conoce (vea el ajuste PRINTER_TLS_VERIFY).',
       },
       external_storage: {
         title: 'Almacenar archivos enviados en almacenamiento externo (paso 4 de instalación)',

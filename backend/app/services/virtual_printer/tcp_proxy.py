@@ -20,6 +20,8 @@ import subprocess
 from collections.abc import Callable
 from pathlib import Path
 
+from backend.app.services.printer_tls import printer_ssl_context
+
 logger = logging.getLogger(__name__)
 
 
@@ -166,10 +168,9 @@ class TLSProxy:
 
     def _create_client_ssl_context(self) -> ssl.SSLContext:
         """Create SSL context for connecting to printer."""
-        ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
-        # Don't verify printer's certificate (self-signed)
-        ctx.check_hostname = False
-        ctx.verify_mode = ssl.CERT_NONE
+        # Verifies the printer before the slicer's credentials are forwarded
+        # (see printer_tls).
+        ctx = printer_ssl_context()
         ctx.minimum_version = ssl.TLSVersion.TLSv1_2
         # Bambu printers use plain RSA key exchange (no ECDHE/DHE),
         # which modern OpenSSL 3.x defaults exclude. Add them back.

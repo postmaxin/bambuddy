@@ -35,6 +35,7 @@ from backend.app.services.print_storage import (
     last_print_storage_verdict,
 )
 from backend.app.services.printer_manager import printer_manager
+from backend.app.services.printer_tls import PrinterCertificateError, printer_ssl_context
 from backend.app.utils.printer_models import has_external_storage, has_remote_storage_toggle
 
 logger = logging.getLogger(__name__)
@@ -87,9 +88,10 @@ check_port = _check_port
 async def _check_ftps_tls(ip: str, model: str | None, timeout: float = _PORT_PROBE_TIMEOUT) -> str:
     """Probe port 990 the way the FTP client does, and say how far it got.
 
-    Returns ``"ok"``, ``"closed"`` (nothing accepted the TCP connection) or
+    Returns ``"ok"``, ``"closed"`` (nothing accepted the TCP connection),
     ``"no_tls"`` (the port accepted the connection but the TLS handshake did
-    not complete).
+    not complete) or ``"untrusted_cert"`` (the handshake completed but the
+    certificate failed verification, see printer_tls).
 
     A plain TCP probe cannot tell the last two apart, which is exactly how
     #2780 hid: the reporter's diagnostic reported port 990 as reachable and
@@ -103,9 +105,7 @@ async def _check_ftps_tls(ip: str, model: str | None, timeout: float = _PORT_PRO
     stays valid for the pre-save Add-Printer flow where no access code exists
     yet.
     """
-    context = ssl.create_default_context()
-    context.check_hostname = False
-    context.verify_mode = ssl.CERT_NONE
+    context = printer_ssl_context()
     context.minimum_version = ssl.TLSVersion.TLSv1_2
     if get_ftp_profile(model).cap_tls_v1_2:
         context.maximum_version = ssl.TLSVersion.TLSv1_2
@@ -117,6 +117,10 @@ async def _check_ftps_tls(ip: str, model: str | None, timeout: float = _PORT_PRO
             timeout=timeout,
         )
         return "ok"
+    except PrinterCertificateError:
+        # A TLS service answered; its certificate is what failed. Restarting
+        # the printer will not change that, so it must not read as "no_tls".
+        return "untrusted_cert"
     except ssl.SSLError:
         # The socket was accepted and then failed to negotiate TLS. Reaching
         # here at all proves something is listening, so this is never "port
@@ -507,11 +511,12 @@ async def run_connection_diagnostic(
     checks.append(DiagnosticCheck(id="port_mqtt", status="pass" if mqtt_ok else "fail"))
     # "no_tls" gets its own message: the port is open, so the usual advice
     # (unblock port 990) is wrong and only a printer restart helps (#2780).
+    # "untrusted_cert" too: the printer's certificate failed verification.
     checks.append(
         DiagnosticCheck(
             id="port_ftps",
             status="pass" if ftps_state == "ok" else "warn",
-            params={} if ftps_state != "no_tls" else {"reason": "no_tls"},
+            params={"reason": ftps_state} if ftps_state in ("no_tls", "untrusted_cert") else {},
         )
     )
     checks.append(

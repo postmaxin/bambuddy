@@ -143,6 +143,15 @@ services:
       # (https://github.com/maziggy/orca-slicer-api).
       #- SLICER_API_URL=http://localhost:3003
       #
+      # Printer certificate check before the access code is sent. serial (default):
+      # the printer's certificate must chain to Bambu Lab's CA and name the
+      # printer's serial; ca: the chain only; off: no check (the old behaviour).
+      # If a genuine printer is refused, the log says which check failed.
+      #- PRINTER_TLS_VERIFY=serial
+      # Extra CAs (PEM) to trust for printers, for a model whose chain Bambuddy
+      # does not ship yet. The file must be mounted into the container.
+      #- PRINTER_TLS_EXTRA_CA_FILE=/app/data/printer-ca.pem
+      #
       # MFA at-rest encryption key (#1219). Auto-generated to
       # DATA_DIR/.mfa_encryption_key on first startup if unset. Override here
       # to manage the key out-of-band (e.g. via a secret manager).

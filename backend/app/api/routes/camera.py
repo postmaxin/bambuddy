@@ -59,6 +59,7 @@ from backend.app.services.camera_fanout import (
 )
 from backend.app.services.camera_light import camera_light
 from backend.app.services.camera_profiles import get_camera_profile
+from backend.app.services.printer_tls import printer_ssl_context
 from backend.app.utils.ffmpeg_output import (
     FFMPEG_RTSP_LOGLEVEL,
     refuse_rtsp_redirect,
@@ -671,7 +672,7 @@ async def generate_rtsp_mjpeg_stream(
     # ffmpeg's GnuTLS.  This fixes P2S (and potentially other models)
     # dropping the RTSP session after a few seconds due to GnuTLS's
     # hardened Debian defaults rejecting TLS renegotiation.
-    proxy_port, proxy_server = await create_tls_proxy(ip_address, port)
+    proxy_port, proxy_server = await create_tls_proxy(ip_address, port, printer_ssl_context())
     camera_url = f"rtsp://bblp:{access_code}@127.0.0.1:{proxy_port}/streaming/live/1"
 
     # ffmpeg command to output MJPEG stream to stdout

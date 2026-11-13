@@ -7854,6 +7854,7 @@ export default {
         pass: 'Dostępny — wysyłanie plików do druku będzie działać.',
         warn: 'Port 990 jest niedostępny. Monitorowanie może nadal działać, ale wysyłanie wydruków do drukarki się nie powiedzie. Upewnij się, że port 990 nie jest zablokowany.',
         warn_no_tls: 'Port 990 jest otwarty, ale usługa plików drukarki nie kończy uzgadniania TLS. Nie można pobrać plików wydruków, okładek ani timelapse\'ów, więc archiwa pozostają puste. Uruchom ponownie drukarkę — odblokowanie portu nie pomoże.',
+        warn_untrusted_cert: 'Port 990 odpowiedział, ale nie udało się zweryfikować certyfikatu TLS drukarki, więc Bambuddy nie wysłał do niej kodu dostępu. Dziennik serwera podaje, która kontrola się nie powiodła. Jeśli to Twoja drukarka, jej model może używać urzędu certyfikacji, którego Bambuddy jeszcze nie zna (zobacz ustawienie PRINTER_TLS_VERIFY).',
       },
       external_storage: {
         title: 'Zapisuj wysłane pliki w pamięci zewnętrznej (krok instalacji 4)',
