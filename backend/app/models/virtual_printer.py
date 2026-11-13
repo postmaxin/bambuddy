@@ -4,6 +4,7 @@ from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from backend.app.core.database import Base
+from backend.app.core.encryption import EncryptedSecret
 
 # Canonical VP mode values. The legacy values `immediate` (→ archive) and
 # `print_queue` (→ queue) shipped before the UI labels were aligned with the
@@ -67,7 +68,9 @@ class VirtualPrinter(Base):
     # injection (#1516). Default off so existing gcode_snippets users don't
     # silently start injecting; no-op when no snippets exist for the model.
     model: Mapped[str | None] = mapped_column(String(50), nullable=True)  # SSDP model code (server mode)
-    access_code: Mapped[str | None] = mapped_column(String(8), nullable=True)  # 8 chars (server mode)
+    # 8 chars (server mode); encrypted at rest like Printer.access_code, because
+    # a bridging VP holds a copy of its target printer's real code.
+    access_code: Mapped[str | None] = mapped_column(EncryptedSecret(), nullable=True)
     target_printer_id: Mapped[int | None] = mapped_column(
         Integer, ForeignKey("printers.id", ondelete="SET NULL"), nullable=True
     )  # proxy mode

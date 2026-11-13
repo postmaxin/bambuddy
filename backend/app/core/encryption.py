@@ -1,4 +1,5 @@
-"""At-rest encryption for high-value secrets (TOTP keys, OIDC client_secret).
+"""At-rest encryption for high-value secrets (TOTP keys, OIDC client_secret,
+printer access codes).
 
 The encryption key is resolved on first use in this priority order:
 
@@ -26,6 +27,9 @@ import binascii
 import logging
 import os
 from typing import Literal
+
+from sqlalchemy import String
+from sqlalchemy.types import TypeDecorator
 
 logger = logging.getLogger(__name__)
 
@@ -236,3 +240,52 @@ def mfa_decrypt(value: str) -> str:
             "Key rotation is not currently supported — restore the previous key "
             "or have users re-enroll."
         ) from exc
+
+
+def decrypt_stored(value: str | None) -> str | None:
+    """Plaintext of a stored column value: decrypts ``fernet:`` values, returns
+    anything else (legacy plaintext, ``None``) as-is, and never logs.
+
+    Unlike :func:`mfa_decrypt` it does not warn about plaintext when a key is
+    active. For columns read on every poll (printer access codes) that warning
+    would flood the log until the startup migration has encrypted the row.
+    """
+    if value is None or not value.startswith(_FERNET_PREFIX):
+        return value
+    return mfa_decrypt(value)
+
+
+def select_stored(table):
+    """``table.select()`` that returns ``EncryptedSecret`` columns as stored (the
+    ``fernet:`` token) instead of decrypted. For exporters that copy rows
+    between databases and must not turn ciphertext into plaintext."""
+    from sqlalchemy import select, type_coerce
+
+    return select(
+        *[type_coerce(c, String()).label(c.name) if isinstance(c.type, EncryptedSecret) else c for c in table.c]
+    )
+
+
+class EncryptedSecret(TypeDecorator):
+    """A string column that is encrypted at rest with :func:`mfa_encrypt`.
+
+    Python code (and ORM queries) always see plaintext; the database holds a
+    ``fernet:`` token, or plaintext when no key is available. Used where a
+    secret is read through the ORM in many places (printer access codes), so a
+    property-per-column would have to be replicated at every reader and would
+    break column-level queries.
+
+    Not usable in ``WHERE`` comparisons: encryption is randomised, so a bound
+    value never equals the stored token.
+    """
+
+    impl = String(255)
+    cache_ok = True
+
+    def process_bind_param(self, value, dialect):
+        if value is None:
+            return None
+        return mfa_encrypt(value)
+
+    def process_result_value(self, value, dialect):
+        return decrypt_stored(value)

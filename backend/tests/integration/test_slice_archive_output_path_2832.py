@@ -125,7 +125,7 @@ class TestItStaysInTheArchiveDirectory:
             assert path.parent.name.endswith("_sliced"), path
             assert path.resolve().is_relative_to(archive_root.resolve())
         # And nothing appeared beside the archive root either.
-        assert not [p for p in tmp_path.iterdir() if p.name != "archive"]
+        assert not [p for p in tmp_path.iterdir() if p.name not in ("archive", ".mfa_encryption_key")]
 
 
 class TestOrdinaryNamesAreUnchanged:
