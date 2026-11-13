@@ -224,7 +224,7 @@ async def test_the_stream_generator_owns_then_releases_the_collector(monkeypatch
     async def _fake_exec(*_a, **_kw):
         return process
 
-    async def _fake_proxy(_ip, _port):
+    async def _fake_proxy(_ip, _port, _ssl_ctx=None):
         return 48777, _FakeServer()
 
     monkeypatch.setattr(camera, "get_ffmpeg_path", lambda: "/fake/ffmpeg")

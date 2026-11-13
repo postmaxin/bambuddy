@@ -7883,6 +7883,7 @@ errors: {
         pass: 'Åtkomlig — skickande av utskriftsfiler kommer att fungera.',
         warn: 'Port 990 är otillgänglig. Övervakning kan fortfarande fungera, men skickande av utskrifter till skrivaren kommer att misslyckas. Se till att port 990 inte blockeras.',
         warn_no_tls: 'Port 990 är öppen men skrivarens filservice slutför inte ett TLS-handskak. Utskriftsfiler, omslag och timelapse kan inte hämtas, så arkiv förblir tomma. Starta om skrivaren — att låsa upp porten kommer inte att hjälpa.',
+        warn_untrusted_cert: 'Port 990 svarade, men skrivarens TLS-certifikat kunde inte verifieras, så Bambuddy skickade inte åtkomstkoden till den. Serverloggen anger vilken kontroll som misslyckades. Om detta är din skrivare kan modellen använda en certifikatutfärdare som Bambuddy ännu inte känner till (se inställningen PRINTER_TLS_VERIFY).',
       },
       external_storage: {
         title: 'Lagra skickade filer på extern lagring (installationssteg 4)',

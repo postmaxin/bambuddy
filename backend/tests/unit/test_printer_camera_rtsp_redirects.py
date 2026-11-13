@@ -62,7 +62,7 @@ class _Proc:
 
 
 def _capture(process: _Proc):
-    async def _proxy(_ip, _port):
+    async def _proxy(_ip, _port, _ssl_ctx=None):
         return 48998, _FakeServer()
 
     return (
@@ -121,7 +121,7 @@ def printer_stream(monkeypatch):
         spawned.append(args)
         return queue.pop(0) if queue else _Proc(b"", b"", returncode=1)
 
-    async def _proxy(_ip, _port):
+    async def _proxy(_ip, _port, _ssl_ctx=None):
         return 48998, _FakeServer()
 
     monkeypatch.setattr(camera_routes, "get_ffmpeg_path", lambda: "/usr/bin/ffmpeg")

@@ -7740,6 +7740,7 @@ export default {
         pass: 'Erişilebilir — baskı dosyaları gönderme çalışacak.',
         warn: 'Port 990 erişilemez. İzleme yine çalışabilir, ancak yazıcıya baskı gönderme başarısız olacak. Port 990\'ın engellenmediğinden emin olun.',
         warn_no_tls: 'Port 990 açık, ancak yazıcının dosya hizmeti TLS el sıkışmasını tamamlamıyor. Baskı dosyaları, kapak görselleri ve timelapse videoları alınamadığı için arşivler boş kalır. Yazıcıyı yeniden başlatın — portun engelini kaldırmak işe yaramaz.',
+        warn_untrusted_cert: 'Port 990 yanıt verdi, ancak yazıcının TLS sertifikası doğrulanamadı; bu nedenle Bambuddy erişim kodunu göndermedi. Hangi denetimin başarısız olduğu sunucu günlüğünde yazar. Bu sizin yazıcınızsa, modeli Bambuddy\'nin henüz tanımadığı bir sertifika yetkilisi kullanıyor olabilir (PRINTER_TLS_VERIFY ayarına bakın).',
       },
       external_storage: {
         title: 'Gönderilen dosyaları harici depolamada sakla (kurulum adımı 4)',

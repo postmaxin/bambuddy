@@ -24,6 +24,16 @@ from backend.tests.unit.services.mock_ftp_server import MockBambuFTPServer
 BAMBU_DIRS = ("cache", "timelapse", "model", "data", "data/Metadata")
 
 
+@pytest.fixture(autouse=True)
+def _mock_printers_are_self_signed(monkeypatch):
+    """The mock FTPS printers here present self-signed certificates, so these
+    tests connect with printer certificate verification off, as Bambuddy did
+    before it existed. test_printer_tls.py turns it back on and covers it."""
+    from backend.app.core.config import settings
+
+    monkeypatch.setattr(settings, "printer_tls_verify", "off")
+
+
 @pytest.fixture(scope="session")
 def ftp_certs(tmp_path_factory):
     """Generate self-signed TLS certificates once per test session."""

@@ -199,7 +199,7 @@ async def test_departing_generator_leaves_its_successors_registry_entry_alone(mo
     async def _fake_exec(*_args, **_kwargs):
         return _Proc()
 
-    async def _fake_proxy(_ip: str, _port: int):
+    async def _fake_proxy(_ip: str, _port: int, _ssl_ctx=None):
         return 48999, _FakeServer()
 
     monkeypatch.setattr(camera, "get_ffmpeg_path", lambda: "/fake/ffmpeg")

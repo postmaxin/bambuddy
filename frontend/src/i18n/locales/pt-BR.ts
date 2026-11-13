@@ -7788,6 +7788,7 @@ export default {
         pass: 'Acessível — o envio de arquivos de impressão funcionará.',
         warn: 'A porta 990 está inacessível. O monitoramento ainda pode funcionar, mas o envio de impressões para a impressora falhará. Verifique se a porta 990 não está bloqueada.',
         warn_no_tls: 'A porta 990 está aberta, mas o serviço de arquivos da impressora não conclui o handshake TLS. Os arquivos de impressão, as capas e os timelapses não podem ser obtidos, então os arquivos ficam vazios. Reinicie a impressora — desbloquear a porta não resolve.',
+        warn_untrusted_cert: 'A porta 990 respondeu, mas o certificado TLS da impressora não pôde ser verificado, então o Bambuddy não enviou o código de acesso a ela. O log do servidor informa qual verificação falhou. Se esta é a sua impressora, o modelo dela pode usar uma autoridade certificadora que o Bambuddy ainda não conhece (veja a configuração PRINTER_TLS_VERIFY).',
       },
       external_storage: {
         title: 'Armazenar arquivos enviados no armazenamento externo (passo 4 da instalação)',

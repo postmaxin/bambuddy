@@ -2,6 +2,7 @@ import logging
 import os
 import re as _re
 from pathlib import Path
+from typing import Literal
 
 from pydantic import Field
 from pydantic_settings import BaseSettings
@@ -122,6 +123,14 @@ class Settings(BaseSettings):
     # setting.
     slicer_api_url: str = "http://localhost:3003"
     bambu_studio_api_url: str = "http://localhost:3001"
+
+    # Verification of printers' TLS certificates before the access code is sent;
+    # see services/printer_tls.py. PRINTER_TLS_VERIFY: "serial" (the chain must lead
+    # to a Bambu Lab CA and the leaf CN must match the stored serial), "ca" (chain
+    # only) or "off" (no verification). PRINTER_TLS_EXTRA_CA_FILE: a PEM file of
+    # further CAs to trust for printers, for a model whose chain is not shipped yet.
+    printer_tls_verify: Literal["off", "ca", "serial"] = "serial"
+    printer_tls_extra_ca_file: str | None = None
 
     class Config:
         env_file = ".env"

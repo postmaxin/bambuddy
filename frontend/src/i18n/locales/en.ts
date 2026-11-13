@@ -7854,6 +7854,7 @@ export default {
         pass: 'Reachable — sending print files will work.',
         warn: 'Port 990 is unreachable. Monitoring may still work, but sending prints to the printer will fail. Make sure port 990 is not blocked.',
         warn_no_tls: 'Port 990 is open but the printer\'s file service is not completing a TLS handshake. Print files, covers and timelapses cannot be fetched, so archives stay empty. Restart the printer — unblocking the port will not help.',
+        warn_untrusted_cert: 'Port 990 answered, but the printer\'s TLS certificate could not be verified, so Bambuddy did not send it the access code. The server log says which check failed. If this is your printer, its model may use a certificate authority Bambuddy does not know yet (see the PRINTER_TLS_VERIFY setting).',
       },
       external_storage: {
         title: 'Store sent files on external storage (install step 4)',

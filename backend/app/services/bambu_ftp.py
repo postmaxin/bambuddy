@@ -19,6 +19,8 @@ from io import BytesIO
 from pathlib import Path
 from typing import TypeVar
 
+from backend.app.services.printer_tls import PrinterCertificateError, printer_ssl_context
+
 logger = logging.getLogger(__name__)
 
 T = TypeVar("T")
@@ -471,6 +473,7 @@ class FtpFailureKind(Enum):
 
     COOLOFF = "cooloff"  # skipped without contacting the printer (#2780)
     HANDSHAKE = "handshake"  # port 990 answered with something that is not TLS
+    CERTIFICATE = "certificate"  # the printer's certificate failed verification (printer_tls)
     # Port 990 answered in cleartext "421 ... too many connections": the
     # printer has no FTP session left for Bambuddy's address (#3474).
     SESSIONS = "sessions"
@@ -533,11 +536,10 @@ class ImplicitFTP_TLS(FTP_TLS):
         super().__init__(*args, **kwargs)
         self._sock = None
         self.skip_session_reuse = skip_session_reuse
-        self.ssl_context = ssl.create_default_context()
-        self.ssl_context.check_hostname = False
-        self.ssl_context.verify_mode = ssl.CERT_NONE
-        # ``create_default_context()`` does NOT guarantee a protocol floor: it
-        # leaves ``minimum_version`` at ``MINIMUM_SUPPORTED``, and what that
+        # Verifies the printer before USER/PASS go out (see printer_tls).
+        self.ssl_context = printer_ssl_context()
+        # A new context (``create_default_context()`` too) does NOT guarantee a
+        # protocol floor: it leaves ``minimum_version`` at ``MINIMUM_SUPPORTED``, and what that
         # resolves to is a property of the OpenSSL build, not of this code.
         # Measured on identical OpenSSL 3.5.6: python:3.13-slim-trixie (our
         # Docker base) reports TLSv1_2, a bare-metal venv reports
@@ -795,6 +797,14 @@ class BambuFTPClient:
             self.last_failure = FtpFailure(FtpFailureKind.TIMEOUT, str(e))
             self._abandon_connection("connect timed out")
             self._record_stall("connect timed out")
+            return False
+        except PrinterCertificateError as e:
+            # The printer's certificate failed verification, so the login was
+            # never sent; printer_tls has logged which check failed. No cool-off:
+            # the handshake fails fast, and the cool-off's "clears on its own"
+            # message would be wrong for this.
+            self._abandon_connection("certificate not verified")
+            self.last_failure = FtpFailure(FtpFailureKind.CERTIFICATE, str(e))
             return False
         except ssl.SSLError as e:
             # Not a transient failure and not something another path or another
@@ -1538,6 +1548,11 @@ def describe_upload_failure(failure: FtpFailure | None) -> str:
             "The printer's file service answered, but not with TLS, so no file could be sent to it. "
             "Its SD card is not involved. This usually clears by itself; if it does not, power-cycling "
             "the printer has not been found to help either, so please report it."
+        )
+    if failure.kind is FtpFailureKind.CERTIFICATE:
+        return (
+            "The printer's TLS certificate could not be verified, so nothing was sent to it. "
+            "The server log says which check failed; PRINTER_TLS_VERIFY controls this check."
         )
     if failure.kind is FtpFailureKind.COOLOFF:
         return (

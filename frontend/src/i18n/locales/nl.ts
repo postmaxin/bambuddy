@@ -7852,6 +7852,7 @@ export default {
         pass: 'Bereikbaar — het verzenden van afdrukbestanden werkt.',
         warn: 'Poort 990 is niet bereikbaar. Monitoring kan nog werken, maar het verzenden van afdrukken naar de printer mislukt. Zorg dat poort 990 niet wordt geblokkeerd.',
         warn_no_tls: 'Poort 990 is open, maar de bestandsservice van de printer voltooit geen TLS-handshake. Afdrukbestanden, covers en timelapses kunnen niet worden opgehaald, waardoor archieven leeg blijven. Start de printer opnieuw — alleen de poort vrijgeven helpt niet.',
+        warn_untrusted_cert: 'Poort 990 antwoordde, maar het TLS-certificaat van de printer kon niet worden geverifieerd, dus Bambuddy heeft de toegangscode niet verstuurd. Het serverlogboek vermeldt welke controle mislukte. Als dit uw printer is, gebruikt het model mogelijk een certificaatautoriteit die Bambuddy nog niet kent (zie de instelling PRINTER_TLS_VERIFY).',
       },
       external_storage: {
         title: 'Verzonden bestanden op externe opslag bewaren (installatiestap 4)',
