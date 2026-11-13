@@ -3844,15 +3844,20 @@ class TestMqttCommandVerificationFailed:
         mqtt_client._process_message(self._hms_payload(self.OTHER_FAULT))
         assert mqtt_client.state.developer_mode is True
 
-    def test_clearing_the_hms_re_arms_the_probe(self, mqtt_client):
-        """Enabling Developer Mode and restarting must not leave a stuck False."""
+    def test_clearing_the_hms_keeps_the_restricted_verdict(self, mqtt_client):
+        """Re-probing would raise the alert again (#10), so the session latch holds.
+
+        Only an explicit ``fun`` report with the signature bit clear lifts it.
+        """
         mqtt_client._process_message(self._hms_payload(self.VERIFY_FAILED))
         assert mqtt_client.state.developer_mode is False
-        mqtt_client._dev_mode_probed = True
 
         mqtt_client._process_message(self._hms_payload())
-        assert mqtt_client.state.developer_mode is None
+        assert mqtt_client.state.developer_mode is False
         assert mqtt_client._dev_mode_probed is False
+
+        mqtt_client._process_message({"fun": "3EC18FFF9CFF", "print": {"gcode_state": "IDLE"}})
+        assert mqtt_client.state.developer_mode is True
 
     def test_empty_hms_leaves_a_probe_verdict_alone(self, mqtt_client):
         """Only the HMS-derived latch self-clears; a probe's False is not ours to undo."""
@@ -8991,3 +8996,32 @@ class TestUnpromptedTrafficOnRestrictedPrinters:
         assert mqtt_client.set_bed_temperature(60) is True
         mqtt_client._client.publish.assert_called_once()
         assert json.loads(mqtt_client._client.publish.call_args.args[1])["print"]["command"] == "gcode_line"
+
+    def test_flag3_only_restriction_reports_developer_mode_off(self, mqtt_client):
+        """The warnings endpoint reads developer_mode; it must not stay unknown."""
+        self._connect(mqtt_client)
+        mqtt_client._update_state(self._full_frame(fun="", flag3=0x10))
+        assert mqtt_client.state.developer_mode is False
+
+    def test_dismissed_hms_keeps_developer_mode_off_on_next_full_report(self, mqtt_client):
+        mqtt_client._process_message({"print": {"gcode_state": "IDLE", "hms": [{"attr": 83887360, "code": 65543}]}})
+        mqtt_client._process_message({"print": {"gcode_state": "IDLE", "hms": []}})
+        assert mqtt_client.state.developer_mode is False
+        mqtt_client._update_state(self._full_frame())
+        assert mqtt_client.state.developer_mode is False
+        assert mqtt_client._dev_mode_probed is False
+
+    def test_top_level_fun_restricts(self, mqtt_client):
+        self._connect(mqtt_client)
+        mqtt_client._process_message({"fun": "3EC1AFFF9CFF", "print": self._full_frame()})
+        assert self._sent(mqtt_client) == [("pushing", "pushall")]
+
+    def test_top_level_fun_with_bit_clear_clears_hms_latch(self, mqtt_client):
+        mqtt_client._hms_rejected = True
+        mqtt_client._process_message({"fun": "3EC18FFF9CFF", "print": {"gcode_state": "IDLE"}})
+        assert mqtt_client._unsigned_commands_rejected() is False
+
+    def test_flag3_delta_does_not_override_earlier_fun(self, mqtt_client):
+        mqtt_client._update_state(self._full_frame(fun="3EC18FFF9CFF"))
+        mqtt_client._update_state({"flag3": 0x10})
+        assert mqtt_client._unsigned_commands_rejected() is False

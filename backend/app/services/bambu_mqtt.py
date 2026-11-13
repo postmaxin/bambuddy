@@ -1879,6 +1879,9 @@ class BambuMQTTClient:
         # printer's own report ("fun" bit / "flag3") and is refreshed per full frame.
         self._hms_rejected: bool = False
         self._signature_required: bool = False
+        # True once any report has carried a usable "fun": it then outranks "flag3",
+        # which delta frames can repeat on their own.
+        self._fun_reported: bool = False
         # True from (re)connect until the first full status frame has been seen and
         # the deferred connect-time queries have been sent or skipped.
         self._connect_queries_pending: bool = False
@@ -2675,6 +2678,7 @@ class BambuMQTTClient:
         # Parse developer LAN mode from top-level "fun" field
         # Some firmware versions send "fun" at the top level, others inside "print"
         if "fun" in payload:
+            self._update_signature_requirement({"fun": payload["fun"]})
             try:
                 fun_val = payload["fun"]
                 fun_int = fun_val if isinstance(fun_val, int) else int(fun_val, 16)
@@ -6028,6 +6032,10 @@ class BambuMQTTClient:
         self._update_signature_requirement(data)
         if self._connect_queries_pending and len(data) > 30:
             self._send_deferred_connect_queries()
+        if self.state.developer_mode is None and self._unsigned_commands_rejected():
+            # Restriction evidence the probe would only have confirmed (and cannot
+            # be run now): keep the public state in line so the warnings still show.
+            self.state.developer_mode = False
 
         # Parse developer LAN mode from "fun" field
         if "fun" in data:
@@ -6385,10 +6393,13 @@ class BambuMQTTClient:
                 fun_int = fun if isinstance(fun, int) else int(fun, 16)
             except (ValueError, TypeError):
                 return
+            self._fun_reported = True
             self._signature_required = (fun_int & 0x20000000) != 0
             if not self._signature_required:
                 # Developer Mode is explicitly on: any earlier HMS-derived verdict is stale.
                 self._hms_rejected = False
+            return
+        if self._fun_reported:
             return
         flag3 = data.get("flag3")
         if isinstance(flag3, int) and flag3 & 0x10:
@@ -6481,7 +6492,11 @@ class BambuMQTTClient:
           (#2732).
         * gone again → drop the HMS-derived False back to unknown and re-arm the
           probe, so a user who enables Developer Mode and restarts the printer
-          isn't stuck behind a verdict nothing would ever revisit.
+          isn't stuck behind a verdict nothing would ever revisit. The session's
+          ``_hms_rejected`` latch outlives this (#10): the next full report puts the
+          printer back to False and the probe stays off, because re-probing a
+          cloud-mode printer would just raise the alert again. An explicit ``fun``
+          report with the signature bit clear is what lifts it.
 
         A False that came from the probe or the ``fun`` bit is left alone — this
         only ever unwinds its own latch.
@@ -6503,7 +6518,7 @@ class BambuMQTTClient:
         if not self._dev_mode_from_hms:
             return
         logger.info(
-            "[%s] HMS %s cleared — re-probing developer mode",
+            "[%s] HMS %s cleared",
             self.serial_number,
             HMS_MQTT_VERIFY_FAILED,
         )
