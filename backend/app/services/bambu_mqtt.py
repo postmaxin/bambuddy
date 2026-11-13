@@ -1868,6 +1868,22 @@ class BambuMQTTClient:
         # printer) we drop back to "unknown" and let the probe re-run instead of
         # leaving a permanently-wrong False behind (#2732).
         self._dev_mode_from_hms: bool = False
+        # Authorization-control firmware (cloud mode, or LAN mode without Developer
+        # Mode) rejects unsigned *commands* with HMS 0500050000010007 and keeps
+        # a visible alert on the printer for every one. Only the pushall status
+        # request is accepted unsigned, so once we know (or strongly suspect) the
+        # printer is in that state, unprompted traffic is limited to pushall.
+        # ``_hms_rejected`` is a session latch set by the HMS itself; unlike
+        # ``_dev_mode_from_hms`` it is not dropped when the HMS clears, because
+        # re-probing would just raise it again. ``_fun_value`` / ``_flag3_value`` hold
+        # the printer's own latest report.
+        self._hms_rejected: bool = False
+        self._dev_mode_from_restriction: bool = False
+        self._fun_value: int | None = None
+        self._flag3_value: int | None = None
+        # True from (re)connect until the first full status frame has been seen and
+        # the deferred connect-time queries have been sent or skipped.
+        self._connect_queries_pending: bool = False
         self._connect_time: float = 0.0  # monotonic timestamp of last _on_connect
 
         # Set when check_staleness() force-closes the socket to trigger reconnect.
@@ -2152,6 +2168,7 @@ class BambuMQTTClient:
             self._dev_mode_probe_time = 0.0
             self._dev_mode_probe_failures = 0
             self._connect_time = time.monotonic()
+            self._connect_queries_pending = True
             self._report_messages_since_connect = 0
             self._last_ams_cmd_time = 0.0
             self._ams_cmd_unanswered = 0
@@ -2162,7 +2179,7 @@ class BambuMQTTClient:
             self._pending_assignments.clear()
             client.subscribe(self.topic_subscribe)
             # Subscribe to request topic for ams_mapping capture (if supported by broker)
-            if self._request_topic_supported:
+            if self._request_topic_supported and not self._unsigned_commands_rejected():
                 result, mid = client.subscribe(self.topic_publish)
                 if result == mqtt.MQTT_ERR_SUCCESS:
                     self._request_topic_sub_mid = mid
@@ -2177,12 +2194,12 @@ class BambuMQTTClient:
                     BambuMQTTClient._request_topic_cache[self.serial_number] = False
             # Request full status update (includes nozzle info in push_status response)
             self._request_push_all()
-            # Request firmware version info
-            self._request_version()
+            # The firmware-version and K-profile priming queries are commands, not
+            # status requests: authorization firmware rejects them and raises an HMS.
+            # They wait for the first full status frame, which tells us whether this
+            # printer accepts unsigned commands (see _send_deferred_connect_queries).
             # Note: get_accessories returns stale nozzle data on H2D, so we don't use it.
             # The correct nozzle data comes from push_status.
-            # Prime K-profile request (Bambu printers often ignore first request)
-            self._prime_kprofile_request()
             # Immediately broadcast connection state change
             if self.on_state_change:
                 self.on_state_change(self.state)
@@ -2660,6 +2677,7 @@ class BambuMQTTClient:
         # Parse developer LAN mode from top-level "fun" field
         # Some firmware versions send "fun" at the top level, others inside "print"
         if "fun" in payload:
+            self._update_signature_requirement({"fun": payload["fun"]})
             try:
                 fun_val = payload["fun"]
                 fun_int = fun_val if isinstance(fun_val, int) else int(fun_val, 16)
@@ -6010,6 +6028,24 @@ class BambuMQTTClient:
         if mapping_data is not None and "mapping" not in data:
             self.state.raw_data["mapping"] = mapping_data
 
+        self._update_signature_requirement(data)
+        if self._connect_queries_pending and len(data) > 30:
+            self._send_deferred_connect_queries()
+        if self._unsigned_commands_rejected():
+            if self.state.developer_mode is not False:
+                # Keep the public state in line with the restriction evidence (a
+                # cached True from an earlier probe included), so the warnings show.
+                self.state.developer_mode = False
+                self._dev_mode_from_restriction = True
+        elif self._dev_mode_from_restriction:
+            # The restriction lifted (flag3 reported clear): that False was ours, so
+            # drop it to unknown and let the probe run again.
+            self._dev_mode_from_restriction = False
+            if self._fun_value is None and self.state.developer_mode is False:
+                self.state.developer_mode = None
+                self._dev_mode_probed = False
+                self._dev_mode_needs_probe = False
+
         # Parse developer LAN mode from "fun" field
         if "fun" in data:
             try:
@@ -6018,7 +6054,7 @@ class BambuMQTTClient:
                 self.state.developer_mode = (fun_int & 0x20000000) == 0
             except (ValueError, TypeError):
                 pass
-        elif self.state.developer_mode is None and not self._dev_mode_probed:
+        elif self.state.developer_mode is None and not self._dev_mode_probed and not self._unsigned_commands_rejected():
             # No "fun" field — A1/P1 series never send it, so we need to probe.
             # Two gates: (1) wait for a full pushall (30+ keys) so we don't probe
             # before a pushall that might contain "fun" arrives, and (2) delay 5s
@@ -6345,6 +6381,58 @@ class BambuMQTTClient:
         if self.on_state_change:
             self.on_state_change(self.state)
 
+    def _unsigned_commands_rejected(self) -> bool:
+        """True when the printer is known to reject unsigned commands.
+
+        Computed from the latest evidence rather than latched piecemeal: the
+        session's verification-failure latch (``_hms_rejected``), or what the
+        printer last reported itself. A reported "fun" is authoritative (bit
+        0x20000000 = MQTT signature required); only when none has ever been
+        reported does "flag3" (bit 0x10, the authorization system on firmware that
+        sends an empty "fun") count. Both follow ha-bambulab.
+        """
+        if self._hms_rejected:
+            return True
+        if self._fun_value is not None:
+            return (self._fun_value & 0x20000000) != 0
+        return self._flag3_value is not None and (self._flag3_value & 0x10) != 0
+
+    def _update_signature_requirement(self, data: dict) -> None:
+        """Record the "fun" / "flag3" values a report carries; omitted fields keep their last value."""
+        fun = data.get("fun")
+        if fun not in (None, ""):
+            try:
+                self._fun_value = fun if isinstance(fun, int) else int(fun, 16)
+            except (ValueError, TypeError):
+                pass
+            else:
+                if not self._fun_value & 0x20000000:
+                    # Developer Mode is explicitly on: any earlier verdict is stale.
+                    self._hms_rejected = False
+        flag3 = data.get("flag3")
+        if isinstance(flag3, int):
+            self._flag3_value = flag3
+
+    def _send_deferred_connect_queries(self) -> None:
+        """Send, or skip, the connect-time queries that are commands.
+
+        Runs once per connection, on the first full status frame, so the printer's
+        own report (and any HMS in it) is known before we decide. A printer that
+        rejects unsigned commands only ever receives the pushall sent from
+        ``_on_connect``; firmware version stays unknown for it.
+        """
+        self._connect_queries_pending = False
+        if self._unsigned_commands_rejected():
+            logger.info(
+                "[%s] Printer rejects unsigned MQTT commands (cloud mode / authorization "
+                "control): skipping firmware-version and K-profile priming queries",
+                self.serial_number,
+            )
+            return
+        self._request_version()
+        # Prime K-profile request (Bambu printers often ignore the first request)
+        self._prime_kprofile_request()
+
     def _request_push_all(self):
         """Request full status update from printer."""
         if self._client:
@@ -6412,12 +6500,17 @@ class BambuMQTTClient:
           (#2732).
         * gone again → drop the HMS-derived False back to unknown and re-arm the
           probe, so a user who enables Developer Mode and restarts the printer
-          isn't stuck behind a verdict nothing would ever revisit.
+          isn't stuck behind a verdict nothing would ever revisit. The session's
+          ``_hms_rejected`` latch outlives this (#10): the next full report puts the
+          printer back to False and the probe stays off, because re-probing a
+          cloud-mode printer would just raise the alert again. An explicit ``fun``
+          report with the signature bit clear is what lifts it.
 
         A False that came from the probe or the ``fun`` bit is left alone — this
         only ever unwinds its own latch.
         """
         if verify_failed:
+            self._hms_rejected = True
             if not self._dev_mode_from_hms:
                 logger.warning(
                     "[%s] Printer reported HMS %s (MQTT command verification failed): it is "
@@ -6433,7 +6526,7 @@ class BambuMQTTClient:
         if not self._dev_mode_from_hms:
             return
         logger.info(
-            "[%s] HMS %s cleared — re-probing developer mode",
+            "[%s] HMS %s cleared",
             self.serial_number,
             HMS_MQTT_VERIFY_FAILED,
         )
@@ -6463,6 +6556,7 @@ class BambuMQTTClient:
         reason = data.get("reason", "")
 
         if result == "failed" and "verify failed" in reason:
+            self._hms_rejected = True
             self.state.developer_mode = False
             logger.info("[%s] Developer mode probe: DISABLED (reason=%r)", self.serial_number, reason)
         elif str(result).lower() == "success":

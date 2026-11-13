@@ -3844,15 +3844,20 @@ class TestMqttCommandVerificationFailed:
         mqtt_client._process_message(self._hms_payload(self.OTHER_FAULT))
         assert mqtt_client.state.developer_mode is True
 
-    def test_clearing_the_hms_re_arms_the_probe(self, mqtt_client):
-        """Enabling Developer Mode and restarting must not leave a stuck False."""
+    def test_clearing_the_hms_keeps_the_restricted_verdict(self, mqtt_client):
+        """Re-probing would raise the alert again (#10), so the session latch holds.
+
+        Only an explicit ``fun`` report with the signature bit clear lifts it.
+        """
         mqtt_client._process_message(self._hms_payload(self.VERIFY_FAILED))
         assert mqtt_client.state.developer_mode is False
-        mqtt_client._dev_mode_probed = True
 
         mqtt_client._process_message(self._hms_payload())
-        assert mqtt_client.state.developer_mode is None
+        assert mqtt_client.state.developer_mode is False
         assert mqtt_client._dev_mode_probed is False
+
+        mqtt_client._process_message({"fun": "3EC18FFF9CFF", "print": {"gcode_state": "IDLE"}})
+        assert mqtt_client.state.developer_mode is True
 
     def test_empty_hms_leaves_a_probe_verdict_alone(self, mqtt_client):
         """Only the HMS-derived latch self-clears; a probe's False is not ours to undo."""
@@ -8877,3 +8882,169 @@ class TestDryingCycleEndReport:
         assert report.target_temp == 65
         assert report.target_hours == 2
         assert report.peak_minutes == 120
+
+
+class TestUnpromptedTrafficOnRestrictedPrinters:
+    """Cloud-mode / authorization-control printers get only pushall unprompted (#10).
+
+    Every unsigned command raises HMS 0500050000010007 on such a printer, so the
+    connect-time version query, K-profile priming and developer-mode probe must not
+    be sent once the printer is known to be restricted.
+    """
+
+    @pytest.fixture
+    def mqtt_client(self):
+        from backend.app.services.bambu_mqtt import BambuMQTTClient
+
+        client = BambuMQTTClient(
+            ip_address="192.168.1.100",
+            serial_number="01S00A000000000",
+            access_code="12345678",
+        )
+        client._client = MagicMock()
+        client._client.subscribe.return_value = (0, 1)
+        client.state.connected = True
+        return client
+
+    @staticmethod
+    def _full_frame(**extra):
+        frame = {f"key_{i}": i for i in range(35)}
+        frame.update(extra)
+        return frame
+
+    @staticmethod
+    def _sent(client):
+        """The (section, command) of every message published on the request topic."""
+        sent = []
+        for call in client._client.publish.call_args_list:
+            body = json.loads(call.args[1])
+            section = next(iter(body))
+            sent.append((section, body[section]["command"]))
+        return sent
+
+    @staticmethod
+    def _connect(client):
+        client._on_connect(client._client, None, {}, 0)
+        client._connect_time = time.monotonic() - 10.0  # satisfy the 5s probe delay
+
+    def test_connect_itself_sends_only_pushall(self, mqtt_client):
+        self._connect(mqtt_client)
+        assert self._sent(mqtt_client) == [("pushing", "pushall")]
+
+    def test_unrestricted_printer_still_gets_existing_queries(self, mqtt_client):
+        self._connect(mqtt_client)
+        mqtt_client._update_state(self._full_frame(fun="3EC18FFF9CFF"))  # signature bit clear
+        assert self._sent(mqtt_client) == [
+            ("pushing", "pushall"),
+            ("info", "get_version"),
+            ("print", "extrusion_cali_get"),
+        ]
+
+    def test_queries_sent_once_per_connection(self, mqtt_client):
+        self._connect(mqtt_client)
+        mqtt_client._update_state(self._full_frame(fun="3EC18FFF9CFF"))
+        mqtt_client._update_state(self._full_frame(fun="3EC18FFF9CFF"))
+        assert self._sent(mqtt_client).count(("info", "get_version")) == 1
+
+    def test_fun_signature_bit_restricts(self, mqtt_client):
+        self._connect(mqtt_client)
+        mqtt_client._update_state(self._full_frame(fun="3EC1AFFF9CFF"))  # signature bit set
+        assert self._sent(mqtt_client) == [("pushing", "pushall")]
+
+    def test_flag3_authorization_bit_restricts_when_fun_is_empty(self, mqtt_client):
+        self._connect(mqtt_client)
+        mqtt_client._update_state(self._full_frame(fun="", flag3=0x10))
+        assert self._sent(mqtt_client) == [("pushing", "pushall")]
+
+    def test_restricted_printer_is_not_probed_for_developer_mode(self, mqtt_client):
+        self._connect(mqtt_client)
+        mqtt_client._update_state(self._full_frame(fun="", flag3=0x10))
+        assert mqtt_client._dev_mode_probed is False
+        assert all(cmd != "ams_filament_setting" for _, cmd in self._sent(mqtt_client))
+
+    def test_hms_in_first_frame_restricts(self, mqtt_client):
+        self._connect(mqtt_client)
+        frame = self._full_frame(hms=[{"attr": 83887360, "code": 65543}])
+        mqtt_client._update_state(frame)
+        assert self._sent(mqtt_client) == [("pushing", "pushall")]
+
+    def test_hms_latch_survives_clear_and_reconnect(self, mqtt_client):
+        """Once seen, a reconnect must not re-send the queries that raised it."""
+        mqtt_client._process_message({"print": {"gcode_state": "IDLE", "hms": [{"attr": 83887360, "code": 65543}]}})
+        mqtt_client._process_message({"print": {"gcode_state": "IDLE", "hms": []}})  # user dismissed it
+        mqtt_client._client.publish.reset_mock()
+        self._connect(mqtt_client)
+        mqtt_client._update_state(self._full_frame())
+        assert self._sent(mqtt_client) == [("pushing", "pushall")]
+        assert mqtt_client._dev_mode_probed is False
+
+    def test_restricted_printer_skips_request_topic_subscription(self, mqtt_client):
+        mqtt_client._hms_rejected = True
+        self._connect(mqtt_client)
+        topics = [c.args[0] for c in mqtt_client._client.subscribe.call_args_list]
+        assert mqtt_client.topic_publish not in topics
+
+    def test_explicit_developer_mode_clears_hms_latch(self, mqtt_client):
+        mqtt_client._hms_rejected = True
+        mqtt_client._update_state(self._full_frame(fun="3EC18FFF9CFF"))
+        assert mqtt_client._unsigned_commands_rejected() is False
+
+    def test_user_initiated_commands_are_still_sent(self, mqtt_client):
+        """The restriction covers unprompted traffic only."""
+        mqtt_client._hms_rejected = True
+        mqtt_client._connect_queries_pending = False
+        assert mqtt_client.set_bed_temperature(60) is True
+        mqtt_client._client.publish.assert_called_once()
+        assert json.loads(mqtt_client._client.publish.call_args.args[1])["print"]["command"] == "gcode_line"
+
+    def test_flag3_only_restriction_reports_developer_mode_off(self, mqtt_client):
+        """The warnings endpoint reads developer_mode; it must not stay unknown."""
+        self._connect(mqtt_client)
+        mqtt_client._update_state(self._full_frame(fun="", flag3=0x10))
+        assert mqtt_client.state.developer_mode is False
+
+    def test_dismissed_hms_keeps_developer_mode_off_on_next_full_report(self, mqtt_client):
+        mqtt_client._process_message({"print": {"gcode_state": "IDLE", "hms": [{"attr": 83887360, "code": 65543}]}})
+        mqtt_client._process_message({"print": {"gcode_state": "IDLE", "hms": []}})
+        assert mqtt_client.state.developer_mode is False
+        mqtt_client._update_state(self._full_frame())
+        assert mqtt_client.state.developer_mode is False
+        assert mqtt_client._dev_mode_probed is False
+
+    def test_top_level_fun_restricts(self, mqtt_client):
+        self._connect(mqtt_client)
+        mqtt_client._process_message({"fun": "3EC1AFFF9CFF", "print": self._full_frame()})
+        assert self._sent(mqtt_client) == [("pushing", "pushall")]
+
+    def test_top_level_fun_with_bit_clear_clears_hms_latch(self, mqtt_client):
+        mqtt_client._hms_rejected = True
+        mqtt_client._process_message({"fun": "3EC18FFF9CFF", "print": {"gcode_state": "IDLE"}})
+        assert mqtt_client._unsigned_commands_rejected() is False
+
+    def test_flag3_delta_does_not_override_earlier_fun(self, mqtt_client):
+        mqtt_client._update_state(self._full_frame(fun="3EC18FFF9CFF"))
+        mqtt_client._update_state({"flag3": 0x10})
+        assert mqtt_client._unsigned_commands_rejected() is False
+
+    def test_cached_developer_mode_true_is_overridden_by_restriction(self, mqtt_client):
+        mqtt_client.state.developer_mode = True  # e.g. an earlier probe verdict
+        mqtt_client._update_state(self._full_frame(fun="", flag3=0x10))
+        assert mqtt_client.state.developer_mode is False
+
+    def test_probe_verify_failure_latches_for_reconnect(self, mqtt_client):
+        mqtt_client._handle_dev_mode_probe_response({"result": "failed", "reason": "mqtt message verify failed"})
+        mqtt_client._client.publish.reset_mock()
+        self._connect(mqtt_client)
+        mqtt_client._update_state(self._full_frame())
+        assert self._sent(mqtt_client) == [("pushing", "pushall")]
+
+    def test_flag3_authorization_bit_can_clear(self, mqtt_client):
+        mqtt_client._update_state(self._full_frame(fun="", flag3=0x10))
+        assert mqtt_client._unsigned_commands_rejected() is True
+        assert mqtt_client.state.developer_mode is False
+        mqtt_client._update_state({"flag3": 0})
+        assert mqtt_client._unsigned_commands_rejected() is False
+        assert mqtt_client.state.developer_mode is None  # unknown again, so the probe can run
+        assert mqtt_client._dev_mode_probed is False
+        mqtt_client._update_state({"gcode_state": "IDLE"})  # omitted: keeps its last value
+        assert mqtt_client._unsigned_commands_rejected() is False
