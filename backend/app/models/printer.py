@@ -4,6 +4,7 @@ from sqlalchemy import JSON, Boolean, DateTime, Float, String, false, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from backend.app.core.database import Base
+from backend.app.core.encryption import EncryptedSecret
 
 
 class Printer(Base):
@@ -15,7 +16,8 @@ class Printer(Base):
     name: Mapped[str] = mapped_column(String(100))
     serial_number: Mapped[str] = mapped_column(String(50), unique=True)
     ip_address: Mapped[str] = mapped_column(String(253))
-    access_code: Mapped[str] = mapped_column(String(20))
+    # Encrypted at rest (fernet: prefix) when a key is available; see EncryptedSecret.
+    access_code: Mapped[str] = mapped_column(EncryptedSecret())
     model: Mapped[str | None] = mapped_column(String(50))
     location: Mapped[str | None] = mapped_column(String(100))  # Group/location name
     nozzle_count: Mapped[int] = mapped_column(default=1)  # 1 or 2, auto-detected from MQTT

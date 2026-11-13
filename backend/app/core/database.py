@@ -871,8 +871,8 @@ def get_migration_error_count() -> int:
 
 
 async def _migrate_encrypt_legacy_secrets() -> None:
-    """Re-encrypt OIDC ``client_secret`` and TOTP ``secret`` rows that are still
-    stored as plaintext (no ``fernet:`` prefix).
+    """Re-encrypt OIDC ``client_secret``, TOTP ``secret`` and printer / virtual
+    printer ``access_code`` rows that are still stored as plaintext (no ``fernet:`` prefix).
 
     Called from :func:`init_db` after :func:`run_migrations` finishes. No-ops
     when no encryption key is configured (so plaintext storage stays the
@@ -891,11 +891,13 @@ async def _migrate_encrypt_legacy_secrets() -> None:
     write-phase re-checks the prefix before encrypting (guards against double
     encryption from concurrent workers).
     """
-    from sqlalchemy import not_, select
+    from sqlalchemy import not_, select, text, update
 
     from backend.app.core.encryption import is_encryption_active
     from backend.app.models.oidc_provider import OIDCProvider
+    from backend.app.models.printer import Printer
     from backend.app.models.user_totp import UserTOTP
+    from backend.app.models.virtual_printer import VirtualPrinter
 
     global _migration_error_count
 
@@ -923,7 +925,64 @@ async def _migrate_encrypt_legacy_secrets() -> None:
         logger.error("_migrate_encrypt_legacy_secrets: phase 1 read failed", exc_info=True)
         raise  # B3
 
+    # Printer and virtual-printer access codes. Raw SQL for the lookup on
+    # purpose: through the ORM, EncryptedSecret hands back plaintext either way.
+    try:
+        async with async_session() as ro:
+            printer_candidates = [
+                r[0]
+                for r in (
+                    await ro.execute(
+                        text(
+                            "SELECT id FROM printers WHERE access_code IS NOT NULL AND access_code NOT LIKE 'fernet:%'"
+                        )
+                    )
+                ).all()
+            ]
+            vp_candidates = [
+                r[0]
+                for r in (
+                    await ro.execute(
+                        text(
+                            "SELECT id FROM virtual_printers "
+                            "WHERE access_code IS NOT NULL AND access_code != '' AND access_code NOT LIKE 'fernet:%'"
+                        )
+                    )
+                ).all()
+            ]
+    except Exception:
+        logger.error("_migrate_encrypt_legacy_secrets: access code read failed", exc_info=True)
+        raise  # B3
+
     oidc_count = totp_count = error_count = 0
+    access_code_count = 0
+
+    for model, row_ids in ((Printer, printer_candidates), (VirtualPrinter, vp_candidates)):
+        for row_id in row_ids:
+            try:
+                async with async_session() as wr:
+                    # Re-check the raw column inside the write session: a
+                    # concurrent worker may have encrypted the row already.
+                    raw = (
+                        await wr.execute(
+                            text(f"SELECT access_code FROM {model.__tablename__} WHERE id = :id"),  # noqa: S608
+                            {"id": row_id},
+                        )
+                    ).scalar_one_or_none()
+                    if not raw or raw.startswith("fernet:"):
+                        continue
+                    # The type encrypts on bind; ``raw`` is the legacy plaintext.
+                    await wr.execute(update(model).where(model.id == row_id).values(access_code=raw))
+                    await wr.commit()
+                    access_code_count += 1
+            except Exception:
+                logger.error(
+                    "Failed to encrypt access code of %s id=%s — skipping",
+                    model.__name__,
+                    row_id,
+                    exc_info=True,
+                )
+                error_count += 1
 
     # Phase 2 (write): each row in its own AsyncSession + transaction.
     # Failure of one row does NOT block the others.
@@ -970,11 +1029,13 @@ async def _migrate_encrypt_legacy_secrets() -> None:
             error_count += 1
 
     _migration_error_count = error_count
-    if oidc_count or totp_count:
+    if oidc_count or totp_count or access_code_count:
         logger.info(
-            "Re-encrypted legacy plaintext secrets: %d OIDC client_secret(s), %d TOTP secret(s)",
+            "Re-encrypted legacy plaintext secrets: %d OIDC client_secret(s), %d TOTP secret(s), "
+            "%d printer access code(s)",
             oidc_count,
             totp_count,
+            access_code_count,
         )
     elif error_count == 0:
         logger.debug("_migrate_encrypt_legacy_secrets: no rows needed re-encryption")
@@ -4015,6 +4076,13 @@ async def _run_migrations(conn):
             {"old": old_val, "new": new_val},
         )
 
+    # Migration: widen the access-code columns for at-rest encryption. A Fernet
+    # token ("fernet:" + ~100 chars) does not fit VARCHAR(20) / VARCHAR(8).
+    # PostgreSQL-only syntax; SQLite ignores VARCHAR sizes so no-op there.
+    if not is_sqlite():
+        await _safe_execute(conn, "ALTER TABLE printers ALTER COLUMN access_code TYPE VARCHAR(255)")
+        await _safe_execute(conn, "ALTER TABLE virtual_printers ALTER COLUMN access_code TYPE VARCHAR(255)")
+
     # Migration: Auto-sync VP access codes from their target printer.
     # Non-proxy VPs with a target printer (the live-mirror bridge) forward the
     # slicer's MQTT/RTSPS auth bytes through to the real printer, so the VP's
@@ -4023,37 +4091,35 @@ async def _run_migrations(conn):
     # failed to authenticate against the real printer. The route layer now
     # auto-inherits on every create/update; this backfill corrects any rows
     # that pre-date that change. Idempotent (re-running on synced rows is a
-    # no-op because the WHERE clause excludes them). SQLite and Postgres both
-    # accept correlated subqueries in UPDATE — no driver-specific syntax.
+    # no-op because rows already in sync are skipped).
+    # Both columns may hold Fernet tokens (EncryptedSecret), which differ per
+    # encryption even for equal plaintext, so compare and copy in Python on the
+    # decrypted values instead of in SQL.
+    from backend.app.core.encryption import decrypt_stored, mfa_encrypt
+
     mismatch_result = await conn.execute(
         text(
-            "SELECT vp.id AS vp_id, vp.name AS vp_name, p.name AS target_name "
+            "SELECT vp.id AS vp_id, vp.name AS vp_name, vp.access_code AS vp_code, "
+            "p.name AS target_name, p.access_code AS target_code "
             "FROM virtual_printers vp "
             "JOIN printers p ON vp.target_printer_id = p.id "
-            "WHERE vp.mode != 'proxy' "
-            "  AND (vp.access_code IS NULL OR vp.access_code != p.access_code)"
+            "WHERE vp.mode != 'proxy'"
         )
     )
     for row in mismatch_result.fetchall():
+        target_plain = decrypt_stored(row.target_code)
+        if row.vp_code is not None and decrypt_stored(row.vp_code) == target_plain:
+            continue
         logger.info(
             "VP %r (id=%d) access code synced from target printer %r",
             row.vp_name,
             row.vp_id,
             row.target_name,
         )
-    await conn.execute(
-        text(
-            "UPDATE virtual_printers "
-            "SET access_code = ("
-            "    SELECT access_code FROM printers WHERE printers.id = virtual_printers.target_printer_id"
-            ") "
-            "WHERE virtual_printers.target_printer_id IS NOT NULL "
-            "  AND virtual_printers.mode != 'proxy' "
-            "  AND (virtual_printers.access_code IS NULL OR virtual_printers.access_code != ("
-            "      SELECT access_code FROM printers WHERE printers.id = virtual_printers.target_printer_id"
-            "  ))"
+        await conn.execute(
+            text("UPDATE virtual_printers SET access_code = :code WHERE id = :id"),
+            {"code": mfa_encrypt(target_plain) if target_plain is not None else None, "id": row.vp_id},
         )
-    )
 
     # Migration: Recover queue items that got stuck in `skipped` because of
     # the cancellation-cascade bug (#1667). Pre-fix, the scheduler's

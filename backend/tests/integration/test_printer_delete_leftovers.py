@@ -34,7 +34,8 @@ async def test_the_next_printer_given_the_id_starts_clean(async_client: AsyncCli
         assert not printer_manager.is_awaiting_plate_clear(pid)
         state = PrinterState(subtask_name="cube", gcode_file="cube.3mf")
         assert not main._is_bambuddy_authorized_print_in_memory(pid, state)  # the kill switch stops it
-        assert list(tmp_path.iterdir()) == []
+        # (the auto-generated encryption key lives in the same data dir)
+        assert [p for p in tmp_path.iterdir() if p.name != ".mfa_encryption_key"] == []
     finally:
         printer_manager._current_print_user.pop(pid, None)
         printer_manager._awaiting_plate_clear.discard(pid)
@@ -180,7 +181,7 @@ async def test_a_new_printer_starts_without_plate_references(
 
     assert response.status_code == 200, response.text
     assert response.json()["id"] == reused
-    assert sorted(p.name for p in tmp_path.iterdir()) == [
+    assert sorted(p.name for p in tmp_path.iterdir() if p.name != ".mfa_encryption_key") == [
         f"printer_{existing.id}_metadata.json",
         f"printer_{existing.id}_ref_0.jpg",
     ]

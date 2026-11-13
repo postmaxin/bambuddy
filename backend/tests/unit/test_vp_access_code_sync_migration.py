@@ -15,6 +15,7 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 
 from backend.app.core.database import run_migrations
+from backend.app.core.encryption import decrypt_stored
 
 
 @pytest.fixture(autouse=True)
@@ -117,7 +118,7 @@ async def test_non_proxy_vp_with_target_inherits_access_code(engine):
 
     async with engine.connect() as conn:
         code = (await conn.execute(text("SELECT access_code FROM virtual_printers WHERE id = 1"))).scalar()
-    assert code == "REALCODE"
+    assert decrypt_stored(code) == "REALCODE"
 
 
 @pytest.mark.asyncio
@@ -140,7 +141,7 @@ async def test_proxy_vp_access_code_is_left_alone(engine):
 
     async with engine.connect() as conn:
         code = (await conn.execute(text("SELECT access_code FROM virtual_printers WHERE id = 1"))).scalar()
-    assert code == "PROXYCDE"
+    assert decrypt_stored(code) == "PROXYCDE"
 
 
 @pytest.mark.asyncio
@@ -165,7 +166,7 @@ async def test_already_matching_vp_is_left_alone(engine):
 
     async with engine.connect() as conn:
         code = (await conn.execute(text("SELECT access_code FROM virtual_printers WHERE id = 1"))).scalar()
-    assert code == "MATCHED1"
+    assert decrypt_stored(code) == "MATCHED1"
 
 
 @pytest.mark.asyncio
@@ -185,7 +186,7 @@ async def test_non_proxy_vp_without_target_is_left_alone(engine):
 
     async with engine.connect() as conn:
         code = (await conn.execute(text("SELECT access_code FROM virtual_printers WHERE id = 1"))).scalar()
-    assert code == "STANDALN"
+    assert decrypt_stored(code) == "STANDALN"
 
 
 @pytest.mark.asyncio
@@ -207,7 +208,7 @@ async def test_null_vp_access_code_with_target_gets_populated(engine):
 
     async with engine.connect() as conn:
         code = (await conn.execute(text("SELECT access_code FROM virtual_printers WHERE id = 1"))).scalar()
-    assert code == "FRESHCDE"
+    assert decrypt_stored(code) == "FRESHCDE"
 
 
 @pytest.mark.asyncio
@@ -234,5 +235,5 @@ async def test_multi_vp_sync_one_run(engine):
         result = await conn.execute(text("SELECT id, access_code FROM virtual_printers ORDER BY id"))
         rows = dict(result.fetchall())
 
-    assert rows[1] == "AAAAAAAA"
-    assert rows[2] == "BBBBBBBB"
+    assert decrypt_stored(rows[1]) == "AAAAAAAA"
+    assert decrypt_stored(rows[2]) == "BBBBBBBB"
