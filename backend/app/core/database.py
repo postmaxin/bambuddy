@@ -891,7 +891,7 @@ async def _migrate_encrypt_legacy_secrets() -> None:
     write-phase re-checks the prefix before encrypting (guards against double
     encryption from concurrent workers).
     """
-    from sqlalchemy import not_, select, text, update
+    from sqlalchemy import String, not_, select, text, type_coerce, update
 
     from backend.app.core.encryption import is_encryption_active
     from backend.app.models.oidc_provider import OIDCProvider
@@ -972,7 +972,17 @@ async def _migrate_encrypt_legacy_secrets() -> None:
                     if not raw or raw.startswith("fernet:"):
                         continue
                     # The type encrypts on bind; ``raw`` is the legacy plaintext.
-                    await wr.execute(update(model).where(model.id == row_id).values(access_code=raw))
+                    # Only if the stored value is still ``raw``: a code saved since
+                    # the SELECT must not be overwritten with the old one. The
+                    # predicate is coerced to a plain string so EncryptedSecret
+                    # does not encrypt the comparison value.
+                    result = await wr.execute(
+                        update(model)
+                        .where(model.id == row_id, type_coerce(model.access_code, String()) == raw)
+                        .values(access_code=raw)
+                    )
+                    if result.rowcount == 0:  # type: ignore[attr-defined]
+                        continue
                     await wr.commit()
                     access_code_count += 1
             except Exception:
