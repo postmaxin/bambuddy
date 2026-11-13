@@ -1875,13 +1875,11 @@ class BambuMQTTClient:
         # printer is in that state, unprompted traffic is limited to pushall.
         # ``_hms_rejected`` is a session latch set by the HMS itself; unlike
         # ``_dev_mode_from_hms`` it is not dropped when the HMS clears, because
-        # re-probing would just raise it again. ``_signature_required`` mirrors the
-        # printer's own report ("fun" bit / "flag3") and is refreshed per full frame.
+        # re-probing would just raise it again. ``_fun_value`` / ``_flag3_value`` hold
+        # the printer's own latest report.
         self._hms_rejected: bool = False
-        self._signature_required: bool = False
-        # True once any report has carried a usable "fun": it then outranks "flag3",
-        # which delta frames can repeat on their own.
-        self._fun_reported: bool = False
+        self._fun_value: int | None = None
+        self._flag3_value: int | None = None
         # True from (re)connect until the first full status frame has been seen and
         # the deferred connect-time queries have been sent or skipped.
         self._connect_queries_pending: bool = False
@@ -6032,9 +6030,9 @@ class BambuMQTTClient:
         self._update_signature_requirement(data)
         if self._connect_queries_pending and len(data) > 30:
             self._send_deferred_connect_queries()
-        if self.state.developer_mode is None and self._unsigned_commands_rejected():
-            # Restriction evidence the probe would only have confirmed (and cannot
-            # be run now): keep the public state in line so the warnings still show.
+        if self.state.developer_mode is not False and self._unsigned_commands_rejected():
+            # Keep the public state in line with the restriction evidence (a cached
+            # True from an earlier probe included), so the warnings still show.
             self.state.developer_mode = False
 
         # Parse developer LAN mode from "fun" field
@@ -6375,35 +6373,34 @@ class BambuMQTTClient:
     def _unsigned_commands_rejected(self) -> bool:
         """True when the printer is known to reject unsigned commands.
 
-        Evidence: HMS 0500050000010007 (latched for the session), the "fun"
-        signature bit, or the authorization bit in "flag3".
+        Computed from the latest evidence rather than latched piecemeal: the
+        session's verification-failure latch (``_hms_rejected``), or what the
+        printer last reported itself. A reported "fun" is authoritative (bit
+        0x20000000 = MQTT signature required); only when none has ever been
+        reported does "flag3" (bit 0x10, the authorization system on firmware that
+        sends an empty "fun") count. Both follow ha-bambulab.
         """
-        return self._hms_rejected or self._signature_required
+        if self._hms_rejected:
+            return True
+        if self._fun_value is not None:
+            return (self._fun_value & 0x20000000) != 0
+        return self._flag3_value is not None and (self._flag3_value & 0x10) != 0
 
     def _update_signature_requirement(self, data: dict) -> None:
-        """Refresh ``_signature_required`` from a full status frame.
-
-        Mirrors ha-bambulab: "fun" is authoritative when present (bit 0x20000000 =
-        MQTT signature required); firmware that reports an empty "fun" signals the
-        authorization system through "flag3" instead (bit 0x10).
-        """
+        """Record the "fun" / "flag3" values a report carries; omitted fields keep their last value."""
         fun = data.get("fun")
         if fun not in (None, ""):
             try:
-                fun_int = fun if isinstance(fun, int) else int(fun, 16)
+                self._fun_value = fun if isinstance(fun, int) else int(fun, 16)
             except (ValueError, TypeError):
-                return
-            self._fun_reported = True
-            self._signature_required = (fun_int & 0x20000000) != 0
-            if not self._signature_required:
-                # Developer Mode is explicitly on: any earlier HMS-derived verdict is stale.
-                self._hms_rejected = False
-            return
-        if self._fun_reported:
-            return
+                pass
+            else:
+                if not self._fun_value & 0x20000000:
+                    # Developer Mode is explicitly on: any earlier verdict is stale.
+                    self._hms_rejected = False
         flag3 = data.get("flag3")
-        if isinstance(flag3, int) and flag3 & 0x10:
-            self._signature_required = True
+        if isinstance(flag3, int):
+            self._flag3_value = flag3
 
     def _send_deferred_connect_queries(self) -> None:
         """Send, or skip, the connect-time queries that are commands.
@@ -6548,6 +6545,7 @@ class BambuMQTTClient:
         reason = data.get("reason", "")
 
         if result == "failed" and "verify failed" in reason:
+            self._hms_rejected = True
             self.state.developer_mode = False
             logger.info("[%s] Developer mode probe: DISABLED (reason=%r)", self.serial_number, reason)
         elif str(result).lower() == "success":

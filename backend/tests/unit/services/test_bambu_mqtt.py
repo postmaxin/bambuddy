@@ -9025,3 +9025,23 @@ class TestUnpromptedTrafficOnRestrictedPrinters:
         mqtt_client._update_state(self._full_frame(fun="3EC18FFF9CFF"))
         mqtt_client._update_state({"flag3": 0x10})
         assert mqtt_client._unsigned_commands_rejected() is False
+
+    def test_cached_developer_mode_true_is_overridden_by_restriction(self, mqtt_client):
+        mqtt_client.state.developer_mode = True  # e.g. an earlier probe verdict
+        mqtt_client._update_state(self._full_frame(fun="", flag3=0x10))
+        assert mqtt_client.state.developer_mode is False
+
+    def test_probe_verify_failure_latches_for_reconnect(self, mqtt_client):
+        mqtt_client._handle_dev_mode_probe_response({"result": "failed", "reason": "mqtt message verify failed"})
+        mqtt_client._client.publish.reset_mock()
+        self._connect(mqtt_client)
+        mqtt_client._update_state(self._full_frame())
+        assert self._sent(mqtt_client) == [("pushing", "pushall")]
+
+    def test_flag3_authorization_bit_can_clear(self, mqtt_client):
+        mqtt_client._update_state(self._full_frame(fun="", flag3=0x10))
+        assert mqtt_client._unsigned_commands_rejected() is True
+        mqtt_client._update_state({"flag3": 0})
+        assert mqtt_client._unsigned_commands_rejected() is False
+        mqtt_client._update_state({"gcode_state": "IDLE"})  # omitted: keeps its last value
+        assert mqtt_client._unsigned_commands_rejected() is False
