@@ -32,8 +32,9 @@ from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import ec
 from cryptography.x509.oid import NameOID
 
-from backend.app.services import printer_diagnostic, printer_tls
+from backend.app.services import print_scheduler, printer_diagnostic, printer_tls
 from backend.app.services.bambu_ftp import BambuFTPClient, FtpFailureKind, ImplicitFTP_TLS
+from backend.app.services.bambu_mqtt import BambuMQTTClient
 from backend.app.services.camera import close_tls_proxy, create_tls_proxy
 
 FIXTURES = Path()  # set by the session fixture _pki
@@ -300,6 +301,35 @@ def test_mqtt_serial_mismatch_never_gets_the_code(server_factory):
     assert server.received == b""
 
 
+def test_a_contexts_own_serial_wins_over_the_registry(server_factory):
+    # How BambuMQTTClient checks: test_connection() probes a serial typed into
+    # Add Printer, which must be checked but must not replace the saved one.
+    server = server_factory("leaf.pem")
+    printer_tls.register_printer("127.0.0.1", SERIAL)
+    ctx = printer_tls.printer_ssl_context(expected_serial="01P00TYPO000003")
+    with (
+        socket.create_connection(("127.0.0.1", server.port)) as raw,
+        pytest.raises(printer_tls.PrinterCertificateError, match="01P00TYPO000003"),
+    ):
+        ctx.wrap_socket(raw, server_hostname="127.0.0.1")
+    assert printer_tls.expected_serial("127.0.0.1") == SERIAL
+
+
+def test_an_mqtt_probe_with_a_mistyped_serial_leaves_the_registry_alone(server_factory):
+    server = server_factory("leaf.pem")
+    printer_tls.register_printer("127.0.0.1", SERIAL)
+    client = BambuMQTTClient(ip_address="127.0.0.1", serial_number="01P00TYPO000003", access_code=ACCESS_CODE)
+    client.MQTT_PORT = server.port
+    client.connect()
+    try:
+        _settle()
+        assert server.handshakes == 1
+        assert server.received == b""
+    finally:
+        client.disconnect()
+    assert printer_tls.expected_serial("127.0.0.1") == SERIAL
+
+
 def test_ca_mode_skips_the_serial_check(server_factory, monkeypatch):
     monkeypatch.setattr(printer_tls.settings, "printer_tls_verify", "ca")
     server = server_factory("leaf.pem")
@@ -364,6 +394,14 @@ def test_ftp_client_refuses_an_impostor_before_login(server_factory, monkeypatch
     assert client.last_failure is not None
     assert client.last_failure.kind is FtpFailureKind.CERTIFICATE
     assert not BambuFTPClient.handshake_blocked("127.0.0.1")
+
+
+def test_a_certificate_refusal_holds_queued_jobs():
+    # Failing them would let one unrecognised printer eat the whole queue.
+    assert FtpFailureKind.CERTIFICATE in print_scheduler._UPLOAD_REQUEUE_KINDS
+    reason = print_scheduler._refused_upload_hold_reason("P1S", FtpFailureKind.CERTIFICATE)
+    assert "certificate could not be verified" in reason
+    assert "PRINTER_TLS_VERIFY" in reason
 
 
 # --- asyncio: camera TLS proxy and the diagnostic ---------------------------

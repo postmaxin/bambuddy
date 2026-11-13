@@ -23,7 +23,7 @@ import paho.mqtt.client as mqtt
 
 from backend.app.services.hms_actions import HMSAction, get_actions_for_error_code
 from backend.app.services.hms_errors import alert_level_from_print_error, describe_fault
-from backend.app.services.printer_tls import printer_ssl_context, register_printer
+from backend.app.services.printer_tls import printer_ssl_context
 from backend.app.utils.ams_drying import ACTIVE_DRY_STATUSES, DRY_COUNTDOWN_STALL_SECONDS
 from backend.app.utils.ams_humidity import ams_humidity_percent
 from backend.app.utils.paho_teardown import discard_queued_publishes, retire_paho_client
@@ -6564,10 +6564,10 @@ class BambuMQTTClient:
         self._client.on_message = self._on_message
 
         # The printer's certificate is verified in the handshake, before paho sends
-        # the access code in CONNECT (see printer_tls). Registering the serial
-        # lets the FTP, camera and proxy connections to this address check it too.
-        register_printer(self.ip_address, self.serial_number)
-        ssl_context = printer_ssl_context()
+        # the access code in CONNECT (see printer_tls). The serial is this
+        # client's own expectation: test_connection() probes unsaved settings, so
+        # the shared registry is maintained by PrinterManager.connect_printer.
+        ssl_context = printer_ssl_context(expected_serial=self.serial_number)
         # Same reasoning as ImplicitFTP_TLS in bambu_ftp.py: a new context
         # inherits its protocol floor from the OpenSSL build instead of declaring one.
         # Every Bambu broker measured (X1C, H2D on :8883) speaks TLS 1.2 and refuses

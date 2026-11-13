@@ -404,7 +404,8 @@ DISPATCH_MAX_ATTEMPTS = 3
 # failing the item leaves the printer just as idle, and #3409's H2D with an
 # unusable USB stick ate seven jobs within an hour. Every job sent to that
 # printer fails the same way, so they wait too; the retry finds the fix once
-# the user has made it.
+# the user has made it. CERTIFICATE (the printer's certificate failed
+# verification, see printer_tls) needs a setting or a CA, for the same reason.
 #
 # A 553 can also be this one file: a name the card's filesystem cannot hold.
 # That one fails the item, see `_start_print`.
@@ -415,6 +416,7 @@ DISPATCH_MAX_ATTEMPTS = 3
 _UPLOAD_REQUEUE_KINDS: frozenset[FtpFailureKind] = frozenset(
     {
         FtpFailureKind.HANDSHAKE,
+        FtpFailureKind.CERTIFICATE,
         FtpFailureKind.SESSIONS,
         FtpFailureKind.COOLOFF,
         FtpFailureKind.TIMEOUT,
@@ -438,6 +440,11 @@ def _refused_upload_hold_reason(printer_label: str, kind: FtpFailureKind | None)
         return (
             f"{printer_label} refused the file transfer — check its access code on the Printers page. "
             f"{_REFUSED_UPLOAD_TAIL}"
+        )
+    if kind is FtpFailureKind.CERTIFICATE:
+        return (
+            f"{printer_label}'s TLS certificate could not be verified, so no file was sent — the server log "
+            f"says which check failed (PRINTER_TLS_VERIFY). {_REFUSED_UPLOAD_TAIL}"
         )
     if kind is FtpFailureKind.SESSIONS:
         return (

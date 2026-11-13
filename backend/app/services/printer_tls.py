@@ -67,8 +67,10 @@ def _normalize_serial(serial: str) -> str:
 def register_printer(host: str, serial: str | None) -> None:
     """Record the serial of the printer configured at ``host``.
 
-    Called when Bambuddy connects to a printer, so later connections to the same
-    address (FTP, camera, proxy) can check the certificate's CN against it.
+    Called with a saved printer's configuration (``PrinterManager.connect_printer``),
+    so connections to that address (FTP, camera, proxy) can check the
+    certificate's CN against it. Probes of unsaved settings must not call this:
+    they pass ``expected_serial`` to :func:`printer_ssl_context` instead.
     """
     if not host or not serial or not serial.strip():
         return
@@ -133,7 +135,7 @@ def _check_handshake(conn: ssl.SSLSocket | ssl.SSLObject) -> None:
     context = conn.context
     if not isinstance(context, _PrinterSSLContext) or not context.check_serial:
         return
-    want = expected_serial(conn.server_hostname)
+    want = context.expected_serial or expected_serial(conn.server_hostname)
     if want is None:
         return
     cert = conn.getpeercert()
@@ -187,12 +189,15 @@ class _PrinterSSLContext(ssl.SSLContext):
     sslsocket_class = _PrinterSSLSocket
     sslobject_class = _PrinterSSLObject
     check_serial: bool = False
+    expected_serial: str | None = None
 
 
-def printer_ssl_context(mode: TlsVerifyMode | None = None) -> ssl.SSLContext:
+def printer_ssl_context(mode: TlsVerifyMode | None = None, *, expected_serial: str | None = None) -> ssl.SSLContext:
     """A client context for a connection to a printer, verifying it per ``mode``.
 
-    ``mode`` defaults to the ``PRINTER_TLS_VERIFY`` setting. Callers add their own
+    ``mode`` defaults to the ``PRINTER_TLS_VERIFY`` setting. ``expected_serial``,
+    when given, is the serial this connection expects in ``serial`` mode; without
+    it the serial registered for the address (if any) is used. Callers add their own
     protocol-version and cipher adjustments to the returned context; this only
     decides how the printer is verified.
     """
@@ -215,4 +220,6 @@ def printer_ssl_context(mode: TlsVerifyMode | None = None) -> ssl.SSLContext:
     if settings.printer_tls_extra_ca_file:
         ctx.load_verify_locations(cafile=settings.printer_tls_extra_ca_file)
     ctx.check_serial = mode == "serial"
+    if expected_serial and expected_serial.strip():
+        ctx.expected_serial = _normalize_serial(expected_serial)
     return ctx

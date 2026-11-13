@@ -18,6 +18,7 @@ from backend.app.services.bambu_mqtt import (
     get_stage_name,
 )
 from backend.app.services.pause_eta import next_pause
+from backend.app.services.printer_tls import register_printer
 from backend.app.utils.ams_humidity import ams_humidity_percent
 from backend.app.utils.kprofile_lookup import build_slot_k_resolver
 from backend.app.utils.printer_models import has_ams3h
@@ -815,6 +816,10 @@ class PrinterManager:
         """Connect to a printer."""
         if printer.id in self._clients:
             self.disconnect_printer(printer.id)
+
+        # Saved configuration only: FTP, camera and proxy connections to this
+        # address check the certificate's serial against it (printer_tls).
+        register_printer(printer.ip_address, printer.serial_number)
 
         printer_id = printer.id
 
