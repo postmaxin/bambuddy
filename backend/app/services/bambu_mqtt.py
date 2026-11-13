@@ -1878,6 +1878,7 @@ class BambuMQTTClient:
         # re-probing would just raise it again. ``_fun_value`` / ``_flag3_value`` hold
         # the printer's own latest report.
         self._hms_rejected: bool = False
+        self._dev_mode_from_restriction: bool = False
         self._fun_value: int | None = None
         self._flag3_value: int | None = None
         # True from (re)connect until the first full status frame has been seen and
@@ -6030,10 +6031,20 @@ class BambuMQTTClient:
         self._update_signature_requirement(data)
         if self._connect_queries_pending and len(data) > 30:
             self._send_deferred_connect_queries()
-        if self.state.developer_mode is not False and self._unsigned_commands_rejected():
-            # Keep the public state in line with the restriction evidence (a cached
-            # True from an earlier probe included), so the warnings still show.
-            self.state.developer_mode = False
+        if self._unsigned_commands_rejected():
+            if self.state.developer_mode is not False:
+                # Keep the public state in line with the restriction evidence (a
+                # cached True from an earlier probe included), so the warnings show.
+                self.state.developer_mode = False
+                self._dev_mode_from_restriction = True
+        elif self._dev_mode_from_restriction:
+            # The restriction lifted (flag3 reported clear): that False was ours, so
+            # drop it to unknown and let the probe run again.
+            self._dev_mode_from_restriction = False
+            if self._fun_value is None and self.state.developer_mode is False:
+                self.state.developer_mode = None
+                self._dev_mode_probed = False
+                self._dev_mode_needs_probe = False
 
         # Parse developer LAN mode from "fun" field
         if "fun" in data:

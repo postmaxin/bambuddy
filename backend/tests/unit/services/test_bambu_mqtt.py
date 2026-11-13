@@ -9041,7 +9041,10 @@ class TestUnpromptedTrafficOnRestrictedPrinters:
     def test_flag3_authorization_bit_can_clear(self, mqtt_client):
         mqtt_client._update_state(self._full_frame(fun="", flag3=0x10))
         assert mqtt_client._unsigned_commands_rejected() is True
+        assert mqtt_client.state.developer_mode is False
         mqtt_client._update_state({"flag3": 0})
         assert mqtt_client._unsigned_commands_rejected() is False
+        assert mqtt_client.state.developer_mode is None  # unknown again, so the probe can run
+        assert mqtt_client._dev_mode_probed is False
         mqtt_client._update_state({"gcode_state": "IDLE"})  # omitted: keeps its last value
         assert mqtt_client._unsigned_commands_rejected() is False
