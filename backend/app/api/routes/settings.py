@@ -24,6 +24,7 @@ from backend.app.core.auth import (
 )
 from backend.app.core.config import APP_VERSION, settings as app_settings
 from backend.app.core.database import get_db
+from backend.app.core.encryption import select_stored
 from backend.app.core.permissions import Permission
 from backend.app.core.printer_scope import PrinterScope
 from backend.app.models.settings import Settings
@@ -979,7 +980,8 @@ async def create_backup_zip(output_path: Path | None = None) -> tuple[Path, str]
             # Export data from Postgres to SQLite
             async with engine.connect() as conn:
                 for table in metadata.sorted_tables:
-                    result = await conn.execute(table.select())
+                    # As stored: an encrypted column must stay ciphertext in the backup.
+                    result = await conn.execute(select_stored(table))
                     rows = result.fetchall()
                     if not rows:
                         continue

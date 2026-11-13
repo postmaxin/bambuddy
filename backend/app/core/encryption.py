@@ -255,6 +255,17 @@ def decrypt_stored(value: str | None) -> str | None:
     return mfa_decrypt(value)
 
 
+def select_stored(table):
+    """``table.select()`` that returns ``EncryptedSecret`` columns as stored (the
+    ``fernet:`` token) instead of decrypted. For exporters that copy rows
+    between databases and must not turn ciphertext into plaintext."""
+    from sqlalchemy import select, type_coerce
+
+    return select(
+        *[type_coerce(c, String()).label(c.name) if isinstance(c.type, EncryptedSecret) else c for c in table.c]
+    )
+
+
 class EncryptedSecret(TypeDecorator):
     """A string column that is encrypted at rest with :func:`mfa_encrypt`.
 

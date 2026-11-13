@@ -15,6 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from backend.app.core import encryption as enc_mod
 from backend.app.core.database import _migrate_encrypt_legacy_secrets
+from backend.app.core.encryption import select_stored
 from backend.app.models.printer import Printer
 from backend.app.models.virtual_printer import VirtualPrinter
 
@@ -105,7 +106,7 @@ async def test_startup_migration_encrypts_legacy_rows(test_engine, monkeypatch):
         await conn.execute(
             text(
                 "INSERT INTO virtual_printers (id, name, enabled, mode, access_code, serial_suffix, position) "
-                "VALUES (1, 'VP', 0, 'archive', 'VPCODE12', '391800001', 1)"
+                "VALUES (1, 'VP', FALSE, 'archive', 'VPCODE12', '391800001', 1)"
             )
         )
 
@@ -175,8 +176,10 @@ async def test_vp_access_code_encrypted_and_synced_from_target(test_engine, prin
     from backend.app.core import database as database_module, db_dialect
     from backend.app.core.database import run_migrations
 
-    monkeypatch.setattr(db_dialect, "is_sqlite", lambda: True)
-    monkeypatch.setattr(database_module, "is_sqlite", lambda: True)
+    # Follow the engine under test (SQLite, or PostgreSQL with TEST_POSTGRES_URL).
+    on_sqlite = test_engine.dialect.name == "sqlite"
+    monkeypatch.setattr(db_dialect, "is_sqlite", lambda: on_sqlite)
+    monkeypatch.setattr(database_module, "is_sqlite", lambda: on_sqlite)
     maker = async_sessionmaker(test_engine, class_=AsyncSession, expire_on_commit=False)
     monkeypatch.setattr(database_module, "async_session", maker)
 
@@ -185,7 +188,7 @@ async def test_vp_access_code_encrypted_and_synced_from_target(test_engine, prin
         await conn.execute(
             text(
                 "INSERT INTO virtual_printers (id, name, enabled, mode, access_code, target_printer_id, "
-                "serial_suffix, position) VALUES (1, 'VP', 0, 'queue', 'OLDVPCDE', :t, '391800001', 1)"
+                "serial_suffix, position) VALUES (1, 'VP', FALSE, 'queue', 'OLDVPCDE', :t, '391800001', 1)"
             ),
             {"t": printer.id},
         )
@@ -201,3 +204,21 @@ async def test_vp_access_code_encrypted_and_synced_from_target(test_engine, prin
     async with test_engine.begin() as conn:
         await run_migrations(conn)
     assert await _raw(test_engine, "virtual_printers", 1) == raw
+
+
+@pytest.mark.asyncio
+async def test_backup_export_select_keeps_ciphertext(test_engine, printer_factory):
+    """The PostgreSQL backup exporter copies rows with select_stored(), which
+    must not decrypt: the portable backup holds what the database holds."""
+    from backend.app.core.database import Base
+
+    printer = await printer_factory(access_code=CODE)
+    stored = await _raw(test_engine, "printers", printer.id)
+    table = Base.metadata.tables["printers"]
+    async with test_engine.connect() as conn:
+        plain_rows = (await conn.execute(table.select())).mappings().all()
+        stored_rows = (await conn.execute(select_stored(table))).mappings().all()
+    assert plain_rows[0]["access_code"] == CODE
+    assert stored_rows[0]["access_code"] == stored
+    assert stored_rows[0]["access_code"].startswith("fernet:")
+    assert list(stored_rows[0].keys()) == list(plain_rows[0].keys())
