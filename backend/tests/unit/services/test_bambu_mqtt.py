@@ -8984,6 +8984,53 @@ class TestUnpromptedTrafficOnRestrictedPrinters:
         topics = [c.args[0] for c in mqtt_client._client.subscribe.call_args_list]
         assert mqtt_client.topic_publish not in topics
 
+    @staticmethod
+    def _subscribed(client):
+        return [c.args[0] for c in client._client.subscribe.call_args_list]
+
+    def test_connect_does_not_subscribe_request_topic_before_first_frame(self, mqtt_client):
+        """Restriction is unknown on the first connect, so nothing may subscribe yet (#12)."""
+        self._connect(mqtt_client)
+        assert self._subscribed(mqtt_client) == [mqtt_client.topic_subscribe]
+
+    def test_restricted_printer_never_subscribes_request_topic_on_first_connect(self, mqtt_client):
+        """takenoko: P1S 01.10.00.00 in cloud mode, flag3=90783 (0x10 set), no fun."""
+        self._connect(mqtt_client)
+        mqtt_client._update_state(self._full_frame(flag3=90783))
+        assert mqtt_client._unsigned_commands_rejected() is True
+        assert self._subscribed(mqtt_client) == [mqtt_client.topic_subscribe]
+        assert mqtt_client._request_topic_sub_time == 0.0
+
+    def test_unrestricted_printer_subscribes_request_topic_after_first_frame(self, mqtt_client):
+        self._connect(mqtt_client)
+        mqtt_client._update_state(self._full_frame(fun="3EC18FFF9CFF"))
+        assert self._subscribed(mqtt_client) == [mqtt_client.topic_subscribe, mqtt_client.topic_publish]
+        assert mqtt_client._request_topic_sub_mid == 1
+        assert mqtt_client._request_topic_sub_time > 0
+        assert mqtt_client._request_topic_confirmed is False
+
+    def test_request_topic_subscribed_once_per_connection(self, mqtt_client):
+        self._connect(mqtt_client)
+        mqtt_client._update_state(self._full_frame(fun="3EC18FFF9CFF"))
+        mqtt_client._update_state(self._full_frame(fun="3EC18FFF9CFF"))
+        assert self._subscribed(mqtt_client).count(mqtt_client.topic_publish) == 1
+
+    def test_unsupported_request_topic_is_not_subscribed_after_first_frame(self, mqtt_client):
+        mqtt_client._request_topic_supported = False
+        self._connect(mqtt_client)
+        mqtt_client._update_state(self._full_frame(fun="3EC18FFF9CFF"))
+        assert mqtt_client.topic_publish not in self._subscribed(mqtt_client)
+
+    def test_failed_request_topic_subscribe_disables_it(self, mqtt_client):
+        from backend.app.services.bambu_mqtt import BambuMQTTClient
+
+        BambuMQTTClient._request_topic_cache.pop(mqtt_client.serial_number, None)
+        mqtt_client._client.subscribe.return_value = (4, None)  # not MQTT_ERR_SUCCESS
+        self._connect(mqtt_client)
+        mqtt_client._update_state(self._full_frame(fun="3EC18FFF9CFF"))
+        assert mqtt_client._request_topic_supported is False
+        BambuMQTTClient._request_topic_cache.pop(mqtt_client.serial_number, None)
+
     def test_explicit_developer_mode_clears_hms_latch(self, mqtt_client):
         mqtt_client._hms_rejected = True
         mqtt_client._update_state(self._full_frame(fun="3EC18FFF9CFF"))
