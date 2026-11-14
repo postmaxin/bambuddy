@@ -62,7 +62,7 @@ def test_match_ipcam_chunks_uses_archive_window_and_ignores_non_video_entries():
 
 @pytest.mark.asyncio
 async def test_build_printer_files_zip_stages_on_data_volume_and_compresses_by_type(tmp_path, monkeypatch):
-    printer = SimpleNamespace(ip_address="printer", access_code="code", model="X1C")
+    printer = SimpleNamespace(ip_address="printer", access_code="code", serial_number="01P00TEST000001", model="X1C")
     monkeypatch.setattr(settings, "archive_dir", tmp_path / "archive")
 
     payloads = {
@@ -101,7 +101,7 @@ async def test_build_printer_files_zip_stages_on_data_volume_and_compresses_by_t
 
 @pytest.mark.asyncio
 async def test_build_printer_files_zip_offloads_blocking_zip_and_filesystem_work(tmp_path, monkeypatch):
-    printer = SimpleNamespace(ip_address="printer", access_code="code", model="X1C")
+    printer = SimpleNamespace(ip_address="printer", access_code="code", serial_number="01P00TEST000001", model="X1C")
     monkeypatch.setattr(settings, "archive_dir", tmp_path / "archive")
     event_loop_thread = threading.get_ident()
     offloaded_threads: list[int] = []
@@ -153,7 +153,7 @@ async def test_prune_stale_printer_file_bundles_removes_hour_old_abandoned_bundl
 
 @pytest.mark.asyncio
 async def test_build_printer_files_zip_skips_relative_and_nul_paths(tmp_path, monkeypatch):
-    printer = SimpleNamespace(ip_address="printer", access_code="code", model="X1C")
+    printer = SimpleNamespace(ip_address="printer", access_code="code", serial_number="01P00TEST000001", model="X1C")
     monkeypatch.setattr(settings, "archive_dir", tmp_path / "archive")
 
     async def fake_download(_ip, _code, remote_path, local_path: Path, **_kwargs):
@@ -180,7 +180,7 @@ async def test_build_printer_files_zip_skips_relative_and_nul_paths(tmp_path, mo
 
 @pytest.mark.asyncio
 async def test_build_printer_files_zip_rejects_oversized_selection_before_download(tmp_path, monkeypatch):
-    printer = SimpleNamespace(ip_address="printer", access_code="code", model="X1C")
+    printer = SimpleNamespace(ip_address="printer", access_code="code", serial_number="01P00TEST000001", model="X1C")
     monkeypatch.setattr(settings, "archive_dir", tmp_path / "archive")
     download = AsyncMock()
 
@@ -199,7 +199,7 @@ async def test_build_printer_files_zip_rejects_oversized_selection_before_downlo
 
 @pytest.mark.asyncio
 async def test_build_printer_files_zip_rejects_insufficient_data_volume_space(tmp_path, monkeypatch):
-    printer = SimpleNamespace(ip_address="printer", access_code="code", model="X1C")
+    printer = SimpleNamespace(ip_address="printer", access_code="code", serial_number="01P00TEST000001", model="X1C")
     monkeypatch.setattr(settings, "archive_dir", tmp_path / "archive")
     monkeypatch.setattr("backend.app.services.printer_media.shutil.disk_usage", lambda _path: SimpleNamespace(free=1))
 
@@ -219,7 +219,7 @@ async def test_build_printer_files_zip_keeps_a_file_whose_listing_size_went_stal
     the one selection the user came for; a genuinely short RETR is already
     rejected a layer down (test_bambu_ftp.py).
     """
-    printer = SimpleNamespace(ip_address="printer", access_code="code", model="X1C")
+    printer = SimpleNamespace(ip_address="printer", access_code="code", serial_number="01P00TEST000001", model="X1C")
     monkeypatch.setattr(settings, "archive_dir", tmp_path / "archive")
 
     async def fake_download(_ip, _code, _remote_path, local_path: Path, **_kwargs):
@@ -260,7 +260,7 @@ def test_match_ipcam_chunks_caps_an_unfinished_archive_window():
 
 @pytest.mark.asyncio
 async def test_build_printer_files_zip_cleans_bundle_on_cancellation(tmp_path, monkeypatch):
-    printer = SimpleNamespace(ip_address="printer", access_code="code", model="X1C")
+    printer = SimpleNamespace(ip_address="printer", access_code="code", serial_number="01P00TEST000001", model="X1C")
     monkeypatch.setattr(settings, "archive_dir", tmp_path / "archive")
 
     async def cancel_download(*_args, **_kwargs):
@@ -278,7 +278,7 @@ async def test_build_printer_files_zip_cleans_bundle_on_cancellation(tmp_path, m
 
 @pytest.mark.asyncio
 async def test_build_printer_files_zip_reports_per_file_progress(tmp_path, monkeypatch):
-    printer = SimpleNamespace(ip_address="printer", access_code="code", model="X1C")
+    printer = SimpleNamespace(ip_address="printer", access_code="code", serial_number="01P00TEST000001", model="X1C")
     monkeypatch.setattr(settings, "archive_dir", tmp_path / "archive")
     progress: list[tuple[int, int]] = []
 
@@ -317,7 +317,7 @@ async def test_two_preparations_run_at_the_same_time(tmp_path, monkeypatch):
     same code path serves the file browser's 3MF preview, so it would block that
     too, for as long as the selection takes.
     """
-    printer = SimpleNamespace(ip_address="printer", access_code="code", model="X1C")
+    printer = SimpleNamespace(ip_address="printer", access_code="code", serial_number="01P00TEST000001", model="X1C")
     monkeypatch.setattr(settings, "archive_dir", tmp_path / "archive")
     active = 0
     max_active = 0
@@ -358,7 +358,7 @@ async def test_concurrent_preparations_both_stop_at_the_disk_reserve(tmp_path, m
     The per-file check against actual bytes is, and it stops both of them
     without leaving a staged bundle behind.
     """
-    printer = SimpleNamespace(ip_address="printer", access_code="code", model="X1C")
+    printer = SimpleNamespace(ip_address="printer", access_code="code", serial_number="01P00TEST000001", model="X1C")
     archive_dir = tmp_path / "archive"
     monkeypatch.setattr(settings, "archive_dir", archive_dir)
     # Enough for the preflight, which is told 2 bytes; nowhere near enough for

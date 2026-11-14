@@ -240,7 +240,7 @@ class TestATimeoutHoldsOffTheBackgroundScans:
 
         real = bambu_ftp.list_files_result_async
 
-        async def _short(ip, code, path, timeout=30.0, socket_timeout=None, printer_model=None):
+        async def _short(ip, code, path, timeout=30.0, socket_timeout=None, printer_model=None, serial=None):
             return await real(ip, code, path, timeout=0.1, printer_model=printer_model)
 
         monkeypatch.setattr(bambu_ftp, "BambuFTPClient", HungClient)
@@ -258,7 +258,7 @@ class TestATimeoutHoldsOffTheBackgroundScans:
 # ---------------------------------------------------------------------------
 def _printer():
     # No id: skips the external-storage check, which needs a live status.
-    return SimpleNamespace(id=None, ip_address=IP, access_code="12345678", model="H2S")
+    return SimpleNamespace(id=None, ip_address=IP, access_code="12345678", serial_number="01P00TEST000001", model="H2S")
 
 
 def _video(name):
@@ -271,7 +271,7 @@ class TestTheBaselineIsOneWalk:
 
         asked: list[str] = []
 
-        async def _list_result(ip, code, path, timeout=30.0, socket_timeout=None, printer_model=None):
+        async def _list_result(ip, code, path, timeout=30.0, socket_timeout=None, printer_model=None, serial=None):
             asked.append(path)
             bambu_ftp._record_ftps_stall(ip, f"listing {path} timed out")
             return FileListResult(files=[], available=False, timed_out=True)
@@ -301,7 +301,7 @@ class TestTheBaselineIsOneWalk:
 
         asked: list[str] = []
 
-        async def _list_result(ip, code, path, timeout=30.0, socket_timeout=None, printer_model=None):
+        async def _list_result(ip, code, path, timeout=30.0, socket_timeout=None, printer_model=None, serial=None):
             asked.append(path)
             if path == "/timelapse":
                 return FileListResult(files=[], available=True)
@@ -318,7 +318,7 @@ class TestTheBaselineIsOneWalk:
         later one holding the videos says what is on the card."""
         from backend.app import main
 
-        async def _list_result(ip, code, path, timeout=30.0, socket_timeout=None, printer_model=None):
+        async def _list_result(ip, code, path, timeout=30.0, socket_timeout=None, printer_model=None, serial=None):
             if path == "/timelapse":
                 return FileListResult(files=[], available=False)
             if path == "/record":
@@ -332,7 +332,7 @@ class TestTheBaselineIsOneWalk:
     async def test_a_failed_directory_with_nothing_after_it_is_unread(self, monkeypatch):
         from backend.app import main
 
-        async def _list_result(ip, code, path, timeout=30.0, socket_timeout=None, printer_model=None):
+        async def _list_result(ip, code, path, timeout=30.0, socket_timeout=None, printer_model=None, serial=None):
             if path == "/timelapse":
                 return FileListResult(files=[], available=False)
             return FileListResult(files=[], available=False, missing=True)
@@ -346,7 +346,7 @@ class TestTheBaselineIsOneWalk:
 
         asked: list[str] = []
 
-        async def _list(ip, code, path, printer_model=None):
+        async def _list(ip, code, path, printer_model=None, serial=None):
             asked.append(path)
             bambu_ftp._record_ftps_stall(ip, f"listing {path} timed out")
             return []

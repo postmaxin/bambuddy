@@ -195,7 +195,11 @@ async def test_a_printer_file_download_may_use_the_whole_job_budget(monkeypatch,
     monkeypatch.setattr(printer_media, "download_file_async", fake_download)
     monkeypatch.setattr(printer_media, "_ensure_printer_zip_root", lambda: tmp_path)
 
-    printer = type("P", (), {"id": 1, "ip_address": "10.0.0.5", "access_code": "c", "model": "P1S"})()
+    printer = type(
+        "P",
+        (),
+        {"id": 1, "ip_address": "10.0.0.5", "access_code": "c", "model": "P1S", "serial_number": "01P00TEST000001"},
+    )()
     with pytest.raises(printer_media.PrinterFileDownloadError):
         await printer_media.build_printer_file(printer, "/ipcam/clip.mp4", 250 * 1024 * 1024, bundle_key="k1")
 
@@ -210,7 +214,11 @@ async def test_a_printer_file_past_its_deadline_is_a_timeout(monkeypatch, tmp_pa
     monkeypatch.setattr(printer_media, "download_file_async", fake_download)
     monkeypatch.setattr(printer_media, "_ensure_printer_zip_root", lambda: tmp_path)
 
-    printer = type("P", (), {"id": 1, "ip_address": "10.0.0.5", "access_code": "c", "model": "P1S"})()
+    printer = type(
+        "P",
+        (),
+        {"id": 1, "ip_address": "10.0.0.5", "access_code": "c", "model": "P1S", "serial_number": "01P00TEST000001"},
+    )()
     with pytest.raises(TimeoutError):
         await printer_media.build_printer_file(printer, "/ipcam/clip.mp4", 1000, bundle_key="k2")
     assert not (Path(tmp_path) / "k2").exists()

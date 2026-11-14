@@ -44,7 +44,7 @@ class RecordingCapture:
         self._gate = gate
         self.started = asyncio.Event()
 
-    async def __call__(self, ip_address, access_code, model, timeout=15):
+    async def __call__(self, ip_address, access_code, model, timeout=15, *, serial=None):
         self.calls.append((ip_address, timeout))
         self.started.set()
         if self._gate is not None:

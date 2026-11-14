@@ -64,7 +64,9 @@ class _Harness:
         self.registered: list[tuple[int, str, Path]] = []
         self.on_download = None
         self.serves_the_file = False
-        self.printer = SimpleNamespace(id=1, ip_address="172.25.12.149", access_code="x", model="P1S", name="P1S")
+        self.printer = SimpleNamespace(
+            id=1, ip_address="172.25.12.149", access_code="x", serial_number="01P00TEST000001", model="P1S", name="P1S"
+        )
 
     def _get_cached(self, printer_id, name):
         return self.cache.get("path")

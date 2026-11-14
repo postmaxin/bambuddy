@@ -105,12 +105,12 @@ def _patches(main_module, maker, monkeypatch, tmp_path, listing):
     monkeypatch.setattr(main_module, "_TIMELAPSE_SCAN_POLL_INTERVAL_SECONDS", 0.05)
     monkeypatch.setattr(main_module, "_TIMELAPSE_SCAN_TIMEOUT_SECONDS", 3.0)
 
-    async def _list(ip, code, path, printer_model=None):
+    async def _list(ip, code, path, printer_model=None, serial=None):
         if path != "/timelapse":
             return []
         return listing()
 
-    async def _list_result(ip, code, path, timeout=30.0, socket_timeout=None, printer_model=None):
+    async def _list_result(ip, code, path, timeout=30.0, socket_timeout=None, printer_model=None, serial=None):
         # The baseline reads the card with this one (#3474).
         if path != "/timelapse":
             return bambu_ftp.FileListResult(files=[], available=False, missing=True)

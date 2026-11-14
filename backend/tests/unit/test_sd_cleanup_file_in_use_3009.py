@@ -60,7 +60,9 @@ class TestFilesInUse:
 
 
 async def _run_cleanup(state, *, archive_filename, subtask_name):
-    printer = SimpleNamespace(id=1, name="A1", ip_address="192.0.2.10", access_code="12345678", model="A1")
+    printer = SimpleNamespace(
+        id=1, name="A1", ip_address="192.0.2.10", access_code="12345678", serial_number="01P00TEST000001", model="A1"
+    )
     db = AsyncMock()
     db.execute = AsyncMock(
         side_effect=[
