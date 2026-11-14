@@ -125,6 +125,46 @@ async def test_different_printers_do_not_coalesce(patch_capture):
 
 
 @pytest.mark.asyncio
+async def test_same_ip_different_serials_do_not_coalesce(patch_capture):
+    """Two saved printers at one address must not share a frame (#8 review).
+
+    Each capture's TLS check verifies the certificate against ITS serial, so a
+    frame verified for serial A must never be handed to a caller expecting B.
+    Only one of them can be the real device; the other fails its own check.
+    """
+    gate = asyncio.Event()
+    capture = patch_capture(RecordingCapture(gate=gate))
+
+    one = asyncio.create_task(capture_camera_frame_bytes("10.0.2.43", "code", "P2S", serial="SERIALA"))
+    await _let_leader_start(capture)
+    assert capture_in_flight("10.0.2.43", "SERIALA") is True
+    assert capture_in_flight("10.0.2.43", "SERIALB") is False
+    two = asyncio.create_task(capture_camera_frame_bytes("10.0.2.43", "code", "P2S", serial="SERIALB"))
+    await asyncio.sleep(0)
+    gate.set()
+
+    assert {await one, await two} == {FRAME_A, FRAME_B}
+    assert capture.count == 2
+
+
+@pytest.mark.asyncio
+async def test_same_serial_still_coalesces_regardless_of_case(patch_capture):
+    """Same printer, serial written differently: still one connection."""
+    gate = asyncio.Event()
+    capture = patch_capture(RecordingCapture(gate=gate))
+
+    leader = asyncio.create_task(capture_camera_frame_bytes("10.0.2.43", "code", "P2S", serial="01p00c"))
+    await _let_leader_start(capture)
+    follower = asyncio.create_task(capture_camera_frame_bytes("10.0.2.43", "code", "P2S", serial=" 01P00C "))
+    await asyncio.sleep(0)
+    gate.set()
+
+    assert await leader == FRAME_A
+    assert await follower == FRAME_A
+    assert capture.count == 1
+
+
+@pytest.mark.asyncio
 async def test_coalescing_is_not_caching(patch_capture):
     """Sequential callers each capture fresh.
 

@@ -55,13 +55,17 @@ _active_capture_pids: set[int] = set()
 # detection, the camera test and the diagnose tool — so the single-flight lives
 # at the bottom of the stack and needs no call-site changes.
 #
-# Keyed by IP rather than printer_id because IP is what the firmware's one-
-# connection limit applies to: two printer rows pointing at the same address
-# still share one camera. (This function never sees a printer_id anyway.) The
-# key deliberately excludes the timeout, or callers that disagree about it —
+# Keyed by (IP, expected serial) rather than printer_id: IP is what the
+# firmware's one-connection limit applies to, and the serial is what the TLS
+# check verified the frame against (#8). Two saved printers at one address must
+# not share a frame, or a caller expecting serial B would get one verified only
+# for A. That costs nothing real: only one serial can be the device at that
+# address, and the other's capture fails its certificate check before sending.
+# (This function never sees a printer_id anyway.) The key deliberately
+# excludes the timeout, or callers that disagree about it —
 # and they all do, from 10s to 30s — would never coalesce, which is exactly
 # the Obico-vs-snapshot pair from the report.
-_inflight_captures: dict[str, asyncio.Task[bytes | None]] = {}
+_inflight_captures: dict[tuple[str, str | None], asyncio.Task[bytes | None]] = {}
 
 # In-flight connection handlers for each live TLS proxy server (#3001).
 #
@@ -650,7 +654,12 @@ async def capture_camera_frame(
     return False
 
 
-def capture_in_flight(ip_address: str) -> bool:
+def _capture_key(ip_address: str, serial: str | None) -> tuple[str, str | None]:
+    """In-flight registry key: the address plus the serial the frame is verified for."""
+    return (ip_address, serial.strip().upper() if serial and serial.strip() else None)
+
+
+def capture_in_flight(ip_address: str, serial: str | None = None) -> bool:
     """Return True iff a one-shot capture for this IP is running right now.
 
     For callers that need to know whether they will JOIN someone else's
@@ -661,11 +670,11 @@ def capture_in_flight(ip_address: str) -> bool:
     Ordinary consumers should ignore this: they want "a recent frame", and
     capture_camera_frame_bytes() already does the right thing for them.
     """
-    task = _inflight_captures.get(ip_address)
+    task = _inflight_captures.get(_capture_key(ip_address, serial))
     return task is not None and not task.done()
 
 
-def _discard_inflight_capture(ip_address: str, task: asyncio.Task) -> None:
+def _discard_inflight_capture(key: tuple[str, str | None], task: asyncio.Task) -> None:
     """Done-callback: drop the finished task from the in-flight registry.
 
     Guarded on identity so a slow task that finishes after a newer capture
@@ -676,10 +685,10 @@ def _discard_inflight_capture(ip_address: str, task: asyncio.Task) -> None:
     nobody to collect it — and an unretrieved task exception is logged by
     asyncio as a warning with a traceback at an arbitrary later point.
     """
-    if _inflight_captures.get(ip_address) is task:
-        del _inflight_captures[ip_address]
+    if _inflight_captures.get(key) is task:
+        del _inflight_captures[key]
     if not task.cancelled() and task.exception() is not None:
-        logger.debug("In-flight camera capture for %s ended in an exception", ip_address)
+        logger.debug("In-flight camera capture for %s ended in an exception", key[0])
 
 
 async def capture_camera_frame_bytes(
@@ -725,8 +734,9 @@ async def capture_camera_frame_bytes(
     # has finished, so there is no socket left to compete with. Bounded at two
     # rounds: if the capture we joined AND its replacement both failed, a third
     # connection won't help, and this caller has already spent its patience.
+    key = _capture_key(ip_address, serial)
     for _ in range(2):
-        leader = _inflight_captures.get(ip_address)
+        leader = _inflight_captures.get(key)
         if leader is None or leader.done():
             break
         try:
@@ -761,8 +771,8 @@ async def capture_camera_frame_bytes(
     task = asyncio.create_task(
         _capture_camera_frame_bytes_uncoalesced(ip_address, access_code, model, timeout, serial=serial)
     )
-    _inflight_captures[ip_address] = task
-    task.add_done_callback(functools.partial(_discard_inflight_capture, ip_address))
+    _inflight_captures[key] = task
+    task.add_done_callback(functools.partial(_discard_inflight_capture, key))
     # No wait_for here: this caller IS the capture, and the implementation
     # already enforces `timeout` internally where it can also kill the ffmpeg
     # process. A second deadline on top would abandon the subprocess instead.

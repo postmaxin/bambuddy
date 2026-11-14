@@ -186,7 +186,7 @@ async def _check_first_frame(
     # and a pass would be claimed for a connection we never opened. So the
     # stage says so, the same way the live-stream shortcut above declares
     # itself instead of quietly passing.
-    coalesced = capture_in_flight(ip_address)
+    coalesced = capture_in_flight(ip_address, serial)
     try:
         jpeg = await capture_camera_frame_bytes(
             ip_address=ip_address,
