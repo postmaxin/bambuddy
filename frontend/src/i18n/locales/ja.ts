@@ -50,6 +50,14 @@ export default {
       critical: '緊急',
     },
   },
+  passwordRules: {
+    title: 'パスワードの条件:',
+    minLength: '8文字以上',
+    uppercase: '大文字',
+    lowercase: '小文字',
+    digit: '数字',
+    special: '記号',
+  },
   common: {
     secretKept: '保存済みです。そのままにすると維持され、新しい値を入力すると置き換わります。',
     secretReenter: 'アドレスが変更されました。もう一度入力してください。入力するまで保存されません。',
@@ -2637,7 +2645,6 @@ export default {
     enterUsername: 'ユーザー名を入力',
     password: 'パスワード',
     enterPassword: 'パスワードを入力',
-    passwordRequirements: '大文字、小文字、数字、特殊文字を各1文字以上含む8文字以上。',
     confirmPassword: 'パスワードの確認',
     confirmPasswordPlaceholder: 'パスワードを確認',
     // Title tooltips

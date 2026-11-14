@@ -9,6 +9,8 @@ import { X, Mail, Shield, Smartphone, Key } from 'lucide-react';
 import { api, type LoginResponse, type OIDCProviderPublic, type TokenPersistence } from '../api/client';
 import { Card, CardHeader, CardContent } from '../components/Card';
 import { Button } from '../components/Button';
+import { PasswordRules } from '../components/PasswordRules';
+import { isPasswordValid } from '../utils/password';
 
 type LoginStep = 'credentials' | '2fa' | 'reset-password';
 
@@ -461,8 +463,7 @@ export function LoginPage() {
         showToast(t('login.resetPassword.passwordsDoNotMatch'), 'error');
         return;
       }
-      if (newPassword.length < 8) {
-        showToast(t('login.resetPassword.passwordTooShort'), 'error');
+      if (!isPasswordValid(newPassword)) {
         return;
       }
       resetPasswordMutation.mutate();
@@ -496,8 +497,8 @@ export function LoginPage() {
                 placeholder={t('login.resetPassword.newPasswordPlaceholder')}
                 autoFocus
                 autoComplete="new-password"
-                minLength={8}
               />
+              <PasswordRules password={newPassword} className="mt-2" />
             </div>
 
             <div>
@@ -518,7 +519,7 @@ export function LoginPage() {
 
             <button
               type="submit"
-              disabled={resetPasswordMutation.isPending || !newPassword || !confirmPassword}
+              disabled={resetPasswordMutation.isPending || !confirmPassword || !isPasswordValid(newPassword)}
               className="w-full flex justify-center py-3 px-4 bg-bambu-green hover:bg-bambu-green-light text-white font-medium rounded-lg shadow-lg shadow-bambu-green/20 hover:shadow-bambu-green/30 focus:outline-none focus:ring-2 focus:ring-bambu-green/50 focus:ring-offset-2 focus:ring-offset-bambu-dark-secondary transition-all disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {resetPasswordMutation.isPending ? t('login.resetPassword.saving') : t('login.resetPassword.submit')}

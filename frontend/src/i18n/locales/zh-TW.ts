@@ -50,6 +50,14 @@ export default {
       critical: '緊急',
     },
   },
+  passwordRules: {
+    title: '密碼需包含：',
+    minLength: '至少 8 個字元',
+    uppercase: '一個大寫字母',
+    lowercase: '一個小寫字母',
+    digit: '一個數字',
+    special: '一個特殊字元',
+  },
   common: {
     secretKept: '已儲存。保持不變即可保留，或輸入新值。',
     secretReenter: '位址已變更：請重新輸入。在此之前不會儲存任何內容。',
@@ -2638,7 +2646,6 @@ export default {
     enterUsername: '輸入使用者名稱',
     password: '密碼',
     enterPassword: '輸入密碼',
-    passwordRequirements: '至少 8 個字元，包含一個大寫、一個小寫、一個數字和一個特殊字元。',
     confirmPassword: '確認密碼',
     confirmPasswordPlaceholder: '確認密碼',
     // Title tooltips

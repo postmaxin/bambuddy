@@ -68,7 +68,8 @@ from backend.app.schemas.auth import (
     TestSMTPRequest,
     TestSMTPResponse,
     UserResponse,
-    _validate_password_complexity,
+    password_complexity_message,
+    unmet_password_rules,
 )
 from backend.app.services.email_service import (
     create_password_reset_link_email_from_template,
@@ -301,12 +302,13 @@ async def setup_auth(request: SetupRequest, db: AsyncSession = Depends(get_db, s
                 # Enforce password complexity only when actually creating a new admin.
                 # Schema-level validation was removed so that re-enabling auth with an
                 # existing admin (or LDAP) doesn't reject whatever placeholder the form sends.
-                try:
-                    _validate_password_complexity(request.admin_password)
-                except ValueError as exc:
+                unmet_rules = unmet_password_rules(request.admin_password)
+                if unmet_rules:
+                    # Plain-string detail (unchanged shape for existing clients) that
+                    # now names every unmet rule instead of only the first.
                     raise HTTPException(
                         status_code=status.HTTP_400_BAD_REQUEST,
-                        detail=str(exc),
+                        detail=password_complexity_message(unmet_rules),
                     )
 
                 # Check if username already exists (shouldn't happen if no admin users exist, but check anyway)

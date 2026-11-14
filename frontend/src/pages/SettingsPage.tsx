@@ -6,7 +6,8 @@ import { api } from '../api/client';
 import { useAuth } from '../contexts/AuthContext';
 import { formatDateOnly } from '../utils/date';
 import { getCurrencySymbol, SUPPORTED_CURRENCIES } from '../utils/currency';
-import { checkPasswordComplexity } from '../utils/password';
+import { getUnmetPasswordRules, isPasswordValid } from '../utils/password';
+import { PasswordRules } from '../components/PasswordRules';
 import { fleetAudience, sponsorHref } from '../utils/fleetAudience';
 import { PRESET_CATEGORIES, parsePresetTriple } from '../utils/temperatureFanPresets';
 import { CALIBRATION_MODES, CALIBRATION_MODE_ACTIVE, CALIBRATION_MODE_INACTIVE } from '../utils/calibrationMode';
@@ -983,7 +984,7 @@ export function SettingsPage() {
         showToast(t('settings.toast.passwordsDoNotMatch'), 'error');
         return;
       }
-      const complexityIssue = checkPasswordComplexity(userFormData.password);
+      const [complexityIssue] = getUnmetPasswordRules(userFormData.password);
       if (complexityIssue) {
         const issueToKey = {
           tooShort: 'settings.toast.passwordTooShort',
@@ -1012,7 +1013,7 @@ export function SettingsPage() {
         showToast(t('settings.toast.passwordsDoNotMatch'), 'error');
         return;
       }
-      const complexityIssue = checkPasswordComplexity(userFormData.password);
+      const [complexityIssue] = getUnmetPasswordRules(userFormData.password);
       if (complexityIssue) {
         const issueToKey = {
           tooShort: 'settings.toast.passwordTooShort',
@@ -7489,7 +7490,7 @@ export function SettingsPage() {
                     autoComplete="new-password"
                     minLength={8}
                   />
-                  <p className="text-bambu-gray text-xs mt-1">{t('settings.passwordRequirements')}</p>
+                  <PasswordRules password={userFormData.password ?? ''} className="mt-2" />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-white mb-2">{t('settings.confirmPassword')}</label>
@@ -7548,7 +7549,7 @@ export function SettingsPage() {
                 </Button>
                 <Button
                   onClick={handleCreateUser}
-                  disabled={createUserMutation.isPending || !userFormData.username || !userFormData.password || userFormData.password !== userFormData.confirmPassword || checkPasswordComplexity(userFormData.password) !== null}
+                  disabled={createUserMutation.isPending || !userFormData.username || !userFormData.password || userFormData.password !== userFormData.confirmPassword || !isPasswordValid(userFormData.password)}
                 >
                   {createUserMutation.isPending ? (
                     <>
@@ -7673,7 +7674,7 @@ export function SettingsPage() {
                         autoComplete="new-password"
                         minLength={8}
                       />
-                      <p className="text-bambu-gray text-xs mt-1">{t('settings.passwordRequirements')}</p>
+                      <PasswordRules password={userFormData.password ?? ''} className="mt-2" />
                     </div>
                     {userFormData.password && (
                       <div>
@@ -7774,7 +7775,7 @@ export function SettingsPage() {
                     updateUserMutation.isPending ||
                     !userFormData.username ||
                     (advancedAuthStatus?.advanced_auth_enabled && !userFormData.email) ||
-                    Boolean(!advancedAuthStatus?.advanced_auth_enabled && userFormData.password && (userFormData.password !== userFormData.confirmPassword || checkPasswordComplexity(userFormData.password) !== null))
+                    Boolean(!advancedAuthStatus?.advanced_auth_enabled && userFormData.password && (userFormData.password !== userFormData.confirmPassword || !isPasswordValid(userFormData.password)))
                   }
                 >
                   {updateUserMutation.isPending ? (
@@ -8005,10 +8006,10 @@ export function SettingsPage() {
                     value={changePasswordData.newPassword}
                     onChange={(e) => setChangePasswordData({ ...changePasswordData, newPassword: e.target.value })}
                     className="w-full px-4 py-3 bg-bambu-dark-secondary border border-bambu-dark-tertiary rounded-lg text-white placeholder-bambu-gray focus:outline-none focus:ring-2 focus:ring-bambu-green/50 focus:border-bambu-green transition-colors"
-                    placeholder={t('settings.enterNewPasswordMin6')}
+                    placeholder={t('settings.enterNewPassword')}
                     autoComplete="new-password"
-                    minLength={6}
                   />
+                  <PasswordRules password={changePasswordData.newPassword} className="mt-2" />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-white mb-2">
@@ -8048,8 +8049,7 @@ export function SettingsPage() {
                       showToast(t('settings.toast.passwordsDoNotMatch'), 'error');
                       return;
                     }
-                    if (changePasswordData.newPassword.length < 6) {
-                      showToast(t('settings.toast.passwordTooShort'), 'error');
+                    if (!isPasswordValid(changePasswordData.newPassword)) {
                       return;
                     }
                     setChangePasswordLoading(true);
@@ -8065,7 +8065,7 @@ export function SettingsPage() {
                       setChangePasswordLoading(false);
                     }
                   }}
-                  disabled={changePasswordLoading || !changePasswordData.currentPassword || !changePasswordData.newPassword || changePasswordData.newPassword !== changePasswordData.confirmPassword || changePasswordData.newPassword.length < 6}
+                  disabled={changePasswordLoading || !changePasswordData.currentPassword || !changePasswordData.newPassword || changePasswordData.newPassword !== changePasswordData.confirmPassword || !isPasswordValid(changePasswordData.newPassword)}
                 >
                   {changePasswordLoading ? (
                     <>

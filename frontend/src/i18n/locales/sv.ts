@@ -50,6 +50,14 @@ export default {
       critical: 'Kritiskt',
     },
   },
+  passwordRules: {
+    title: 'Lösenordet måste innehålla:',
+    minLength: 'Minst 8 tecken',
+    uppercase: 'En versal',
+    lowercase: 'En gemen',
+    digit: 'En siffra',
+    special: 'Ett specialtecken',
+  },
   common: {
     secretKept: 'Sparat. Lämna det som det är för att behålla det, eller ange ett nytt värde.',
     secretReenter: 'Adressen har ändrats: ange det igen. Inget sparas förrän du gör det.',
@@ -2690,7 +2698,6 @@ export default {
     enterUsername: 'Ange användarnamn',
     password: 'Lösenord',
     enterPassword: 'Ange lösenord',
-    passwordRequirements: 'Minst 8 tecken, med en versal, en gemen, en siffra och ett specialtecken.',
     confirmPassword: 'Bekräfta lösenord',
     confirmPasswordPlaceholder: 'Bekräfta lösenord',
     // Title tooltips

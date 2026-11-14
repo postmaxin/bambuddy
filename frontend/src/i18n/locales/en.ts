@@ -50,6 +50,14 @@ export default {
       critical: 'Critical',
     },
   },
+  passwordRules: {
+    title: 'Password must have:',
+    minLength: 'At least 8 characters',
+    uppercase: 'An uppercase letter',
+    lowercase: 'A lowercase letter',
+    digit: 'A digit',
+    special: 'A special character',
+  },
   common: {
     secretKept: 'Saved. Leave it as is to keep it, or enter a new value.',
     secretReenter: 'The address changed: enter it again. Nothing is saved until you do.',
@@ -2660,7 +2668,6 @@ export default {
     enterUsername: 'Enter username',
     password: 'Password',
     enterPassword: 'Enter password',
-    passwordRequirements: 'At least 8 characters, with one uppercase, one lowercase, one digit, and one special character.',
     confirmPassword: 'Confirm Password',
     confirmPasswordPlaceholder: 'Confirm password',
     // Title tooltips

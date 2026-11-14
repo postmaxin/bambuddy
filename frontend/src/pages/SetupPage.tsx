@@ -7,6 +7,8 @@ import { useToast } from '../contexts/ToastContext';
 import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
 import { Info } from 'lucide-react';
+import { PasswordRules } from '../components/PasswordRules';
+import { isPasswordValid } from '../utils/password';
 
 export function SetupPage() {
   const navigate = useNavigate();
@@ -63,8 +65,8 @@ export function SetupPage() {
           showToast(t('setup.toast.passwordsDoNotMatch'), 'error');
           return;
         }
-        if (adminPassword.length < 6) {
-          showToast(t('setup.toast.passwordTooShort'), 'error');
+        if (!isPasswordValid(adminPassword)) {
+          // The rule checklist beside the field already shows what is missing.
           return;
         }
       }
@@ -147,9 +149,9 @@ export function SetupPage() {
                     onChange={(e) => setAdminPassword(e.target.value)}
                     className="block w-full px-4 py-3 bg-bambu-dark-secondary border border-bambu-dark-tertiary rounded-lg text-white placeholder-bambu-gray focus:outline-none focus:ring-2 focus:ring-bambu-green/50 focus:border-bambu-green transition-colors"
                     placeholder={t('setup.adminPasswordPlaceholder')}
-                    minLength={6}
                     autoComplete="new-password"
                   />
+                  <PasswordRules password={adminPassword} className="mt-2" />
                 </div>
 
                 {adminPassword && (
@@ -164,7 +166,6 @@ export function SetupPage() {
                       onChange={(e) => setConfirmPassword(e.target.value)}
                       className="block w-full px-4 py-3 bg-bambu-dark-secondary border border-bambu-dark-tertiary rounded-lg text-white placeholder-bambu-gray focus:outline-none focus:ring-2 focus:ring-bambu-green/50 focus:border-bambu-green transition-colors"
                       placeholder={t('setup.confirmPasswordPlaceholder')}
-                      minLength={6}
                       autoComplete="new-password"
                     />
                   </div>
@@ -176,7 +177,7 @@ export function SetupPage() {
           <div>
             <button
               type="submit"
-              disabled={setupMutation.isPending}
+              disabled={setupMutation.isPending || (authEnabled && adminPassword !== '' && !isPasswordValid(adminPassword))}
               className="w-full flex justify-center py-3 px-4 bg-bambu-green hover:bg-bambu-green-light text-white font-medium rounded-lg shadow-lg shadow-bambu-green/20 hover:shadow-bambu-green/30 focus:outline-none focus:ring-2 focus:ring-bambu-green/50 focus:ring-offset-2 focus:ring-offset-bambu-dark-secondary transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-bambu-green"
             >
               {setupMutation.isPending ? t('setup.settingUp') : t('setup.completeSetup')}

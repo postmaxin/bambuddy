@@ -50,6 +50,14 @@ export default {
       critical: 'Kritiek',
     },
   },
+  passwordRules: {
+    title: 'Wachtwoord moet bevatten:',
+    minLength: 'Minstens 8 tekens',
+    uppercase: 'Een hoofdletter',
+    lowercase: 'Een kleine letter',
+    digit: 'Een cijfer',
+    special: 'Een speciaal teken',
+  },
   common: {
     secretKept: 'Opgeslagen. Laat het zo om het te behouden, of voer een nieuwe waarde in.',
     secretReenter: 'Het adres is gewijzigd: voer het opnieuw in. Er wordt niets opgeslagen tot je dat doet.',
@@ -2658,7 +2666,6 @@ export default {
     enterUsername: 'Voer gebruikersnaam in',
     password: 'Wachtwoord',
     enterPassword: 'Voer wachtwoord in',
-    passwordRequirements: 'Minstens 8 tekens, met één hoofdletter, één kleine letter, één cijfer en één speciaal teken.',
     confirmPassword: 'Wachtwoord bevestigen',
     confirmPasswordPlaceholder: 'Bevestig wachtwoord',
     // Title tooltips

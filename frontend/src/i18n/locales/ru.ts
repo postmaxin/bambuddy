@@ -47,6 +47,14 @@ export default {
       critical: 'Критично',
     },
   },
+  passwordRules: {
+    title: 'Пароль должен содержать:',
+    minLength: 'Не менее 8 символов',
+    uppercase: 'Заглавную букву',
+    lowercase: 'Строчную букву',
+    digit: 'Цифру',
+    special: 'Специальный символ',
+  },
   common: {
     secretKept: 'Сохранено. Оставьте как есть, чтобы сохранить, или введите новое значение.',
     secretReenter: 'Адрес изменился: введите значение снова. До этого ничего не сохраняется.',
@@ -2517,7 +2525,6 @@ export default {
     enterUsername: "Введите имя пользователя",
     password: "Пароль",
     enterPassword: "Введите пароль",
-    passwordRequirements: "Не менее 8 символов: одна заглавная и одна строчная буква, одна цифра и один специальный символ.",
     confirmPassword: "Подтвердите пароль",
     confirmPasswordPlaceholder: "Повторите пароль",
     viewReleaseOnGitHub: "Открыть выпуск на GitHub",

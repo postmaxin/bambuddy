@@ -27,6 +27,8 @@ import { AnnouncementsPanel } from './AnnouncementsPanel';
 import { AnnouncementBanner } from './AnnouncementBanner';
 import { useAnnouncements } from '../hooks/useAnnouncements';
 import { plateCheckFailureText } from '../utils/plateCheck';
+import { isPasswordValid } from '../utils/password';
+import { PasswordRules } from './PasswordRules';
 import {
   getHiddenSidebarSystemItemIds,
   getSidebarOrder,
@@ -1290,8 +1292,8 @@ export function Layout() {
                     className="w-full px-4 py-3 bg-bambu-dark-secondary border border-bambu-dark-tertiary rounded-lg text-white placeholder-bambu-gray focus:outline-none focus:ring-2 focus:ring-bambu-green/50 focus:border-bambu-green transition-colors"
                     placeholder={t('changePassword.newPasswordPlaceholder')}
                     autoComplete="new-password"
-                    minLength={6}
                   />
+                  <PasswordRules password={changePasswordData.newPassword} className="mt-2" />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-white mb-2">
@@ -1331,8 +1333,7 @@ export function Layout() {
                       showToast(t('changePassword.passwordsDoNotMatch'), 'error');
                       return;
                     }
-                    if (changePasswordData.newPassword.length < 6) {
-                      showToast(t('changePassword.passwordTooShort'), 'error');
+                    if (!isPasswordValid(changePasswordData.newPassword)) {
                       return;
                     }
                     setChangePasswordLoading(true);
@@ -1348,7 +1349,7 @@ export function Layout() {
                       setChangePasswordLoading(false);
                     }
                   }}
-                  disabled={changePasswordLoading || !changePasswordData.currentPassword || !changePasswordData.newPassword || changePasswordData.newPassword !== changePasswordData.confirmPassword || changePasswordData.newPassword.length < 6}
+                  disabled={changePasswordLoading || !changePasswordData.currentPassword || !changePasswordData.newPassword || changePasswordData.newPassword !== changePasswordData.confirmPassword || !isPasswordValid(changePasswordData.newPassword)}
                 >
                   {changePasswordLoading ? (
                     <>
