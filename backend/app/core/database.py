@@ -3960,6 +3960,13 @@ async def _run_migrations(conn):
                 await conn.execute(
                     text('INSERT INTO settings ("key", value) VALUES (:k, :v)'), {"k": vp_flag, "v": "true"}
                 )
+            # The legacy settings key is only a source for the migration above: no
+            # reader is left (GET/PUT /settings ignore it) and each virtual printer
+            # holds its own code. Drop it, so no plaintext copy of an access code
+            # stays in `settings` once the code lives, encrypted, in virtual_printers.
+            # Reached only when the migration above did not raise, so a failed
+            # copy never loses the value (#4).
+            await conn.execute(text("DELETE FROM settings WHERE key = 'virtual_printer_access_code'"))
     except (OperationalError, ProgrammingError, IntegrityError):
         pass  # Table may not exist yet on first run, or columns have different constraints
 
