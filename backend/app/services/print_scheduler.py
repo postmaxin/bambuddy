@@ -6271,6 +6271,11 @@ class PrintScheduler:
             if not state:
                 logger.debug("Auto-drying: printer %d skipped — no state", pid)
                 continue
+            # Unprompted command: a cloud-mode printer answers it with an HMS alert.
+            drying_client = printer_manager.get_client(pid)
+            if drying_client is not None and not drying_client.accepts_unsigned_commands():
+                logger.debug("Auto-drying: printer %d skipped — it rejects unsigned MQTT commands", pid)
+                continue
             model = printer_manager.get_model(pid)
             firmware = state.firmware_version
 

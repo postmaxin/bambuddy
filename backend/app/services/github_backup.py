@@ -438,6 +438,10 @@ class GitHubBackupService:
             client = printer_manager.get_client(printer.id)
             if not client or not client.state.connected:
                 continue
+            if not client.accepts_unsigned_commands():
+                # extrusion_cali_get would raise an HMS alert on a cloud-mode printer.
+                logger.info("Skipping K-profile backup for %s: printer rejects unsigned MQTT commands", printer.name)
+                continue
 
             serial = printer.serial_number
             printer_profiles = {}

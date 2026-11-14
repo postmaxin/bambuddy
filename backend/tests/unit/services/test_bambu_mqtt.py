@@ -9085,6 +9085,12 @@ class TestUnpromptedTrafficOnRestrictedPrinters:
         mqtt_client._update_state(self._full_frame())
         assert self._sent(mqtt_client) == [("pushing", "pushall")]
 
+    def test_accepts_unsigned_commands_is_the_inverse_of_the_verdict(self, mqtt_client):
+        mqtt_client._update_state(self._full_frame(fun="", flag3=0x10))
+        assert mqtt_client.accepts_unsigned_commands() is False
+        mqtt_client._update_state({"flag3": 0})
+        assert mqtt_client.accepts_unsigned_commands() is True
+
     def test_flag3_authorization_bit_can_clear(self, mqtt_client):
         mqtt_client._update_state(self._full_frame(fun="", flag3=0x10))
         assert mqtt_client._unsigned_commands_rejected() is True

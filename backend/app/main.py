@@ -8060,6 +8060,14 @@ async def prime_kprofile_table(printer_id: int) -> int:
 
     # Deduplicated, order preserved: a dual-nozzle printer with two 0.4s should
     # ask once, and both entries are empty until the first push_status lands.
+    if not client.accepts_unsigned_commands():
+        # extrusion_cali_get is an unsigned command; a cloud-mode printer answers it
+        # with a visible HMS alert (0500050000010007).
+        logging.getLogger(__name__).info(
+            "[Printer %s] Skipping K-profile priming: printer rejects unsigned MQTT commands", printer_id
+        )
+        return 0
+
     diameters = list(dict.fromkeys(n.nozzle_diameter for n in (state.nozzles or []) if n.nozzle_diameter))
     if not diameters:
         logging.getLogger(__name__).debug(
