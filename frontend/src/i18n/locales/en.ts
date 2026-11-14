@@ -3633,7 +3633,7 @@ export default {
     currentPassword: 'Current Password',
     currentPasswordPlaceholder: 'Enter current password',
     newPassword: 'New Password',
-    newPasswordPlaceholder: 'Enter new password (min 6 characters)',
+    newPasswordPlaceholder: 'Enter new password',
     confirmPassword: 'Confirm New Password',
     confirmPasswordPlaceholder: 'Confirm new password',
     passwordsDoNotMatch: 'Passwords do not match',

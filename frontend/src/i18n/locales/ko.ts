@@ -3436,7 +3436,7 @@ export default {
     currentPassword: '현재 비밀번호',
     currentPasswordPlaceholder: '현재 비밀번호 입력',
     newPassword: '새 비밀번호',
-    newPasswordPlaceholder: '새 비밀번호 입력 (최소 6자)',
+    newPasswordPlaceholder: '새 비밀번호 입력',
     confirmPassword: '새 비밀번호 확인',
     confirmPasswordPlaceholder: '새 비밀번호 확인',
     passwordsDoNotMatch: '비밀번호가 일치하지 않습니다',

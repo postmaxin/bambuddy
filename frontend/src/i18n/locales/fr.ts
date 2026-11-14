@@ -3589,7 +3589,7 @@ export default {
     currentPassword: 'Mot de passe actuel',
     currentPasswordPlaceholder: 'Entrez mdp actuel',
     newPassword: 'Nouveau mot de passe',
-    newPasswordPlaceholder: 'Nouveau mdp (min 6 char)',
+    newPasswordPlaceholder: 'Nouveau mot de passe',
     confirmPassword: 'Confirmer nouveau mdp',
     confirmPasswordPlaceholder: 'Confirmez nouveau mdp',
     passwordsDoNotMatch: 'Les mots de passe ne correspondent pas',

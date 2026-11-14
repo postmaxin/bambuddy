@@ -3628,7 +3628,7 @@ export default {
     currentPassword: "Поточний пароль",
     currentPasswordPlaceholder: "Введіть поточний пароль",
     newPassword: "Новий пароль",
-    newPasswordPlaceholder: "Введіть новий пароль (мінімум 6 символів)",
+    newPasswordPlaceholder: "Введіть новий пароль",
     confirmPassword: "Підтвердити новий пароль",
     confirmPasswordPlaceholder: "Підтвердити новий пароль",
     passwordsDoNotMatch: "Паролі не збігаються",

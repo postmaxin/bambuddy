@@ -3603,7 +3603,7 @@ export default {
     currentPassword: 'Contraseña actual',
     currentPasswordPlaceholder: 'Introduzca la contraseña actual',
     newPassword: 'Nueva contraseña',
-    newPasswordPlaceholder: 'Introduzca la nueva contraseña (mín. 6 caracteres)',
+    newPasswordPlaceholder: 'Introduzca la nueva contraseña',
     confirmPassword: 'Confirmar nueva contraseña',
     confirmPasswordPlaceholder: 'Confirme la nueva contraseña',
     passwordsDoNotMatch: 'Las contraseñas no coinciden',

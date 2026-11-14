@@ -3663,7 +3663,7 @@ errors: {
     currentPassword: 'Nuvarande lösenord',
     currentPasswordPlaceholder: 'Ange nuvarande lösenord',
     newPassword: 'Nytt lösenord',
-    newPasswordPlaceholder: 'Ange nytt lösenord (minst 6 tecken)',
+    newPasswordPlaceholder: 'Ange nytt lösenord',
     confirmPassword: 'Bekräfta nytt lösenord',
     confirmPasswordPlaceholder: 'Bekräfta nytt lösenord',
     passwordsDoNotMatch: 'Lösenorden matchar ej',

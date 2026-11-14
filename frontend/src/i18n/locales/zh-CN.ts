@@ -3588,7 +3588,7 @@ export default {
     currentPassword: '当前密码',
     currentPasswordPlaceholder: '输入当前密码',
     newPassword: '新密码',
-    newPasswordPlaceholder: '输入新密码（至少 6 个字符）',
+    newPasswordPlaceholder: '输入新密码',
     confirmPassword: '确认新密码',
     confirmPasswordPlaceholder: '确认新密码',
     passwordsDoNotMatch: '密码不匹配',

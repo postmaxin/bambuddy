@@ -3588,7 +3588,7 @@ export default {
     currentPassword: 'Password attuale',
     currentPasswordPlaceholder: 'Inserisci password attuale',
     newPassword: 'Nuova password',
-    newPasswordPlaceholder: 'Inserisci nuova password (min 6 caratteri)',
+    newPasswordPlaceholder: 'Inserisci nuova password',
     confirmPassword: 'Conferma nuova password',
     confirmPasswordPlaceholder: 'Conferma nuova password',
     passwordsDoNotMatch: 'Le password non coincidono',

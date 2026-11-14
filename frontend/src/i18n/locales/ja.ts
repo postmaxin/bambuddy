@@ -3601,7 +3601,7 @@ export default {
     currentPassword: '現在のパスワード',
     currentPasswordPlaceholder: '現在のパスワードを入力',
     newPassword: '新しいパスワード',
-    newPasswordPlaceholder: '新しいパスワードを入力（6文字以上）',
+    newPasswordPlaceholder: '新しいパスワードを入力',
     confirmPassword: '新しいパスワード確認',
     confirmPasswordPlaceholder: 'パスワードを確認',
     passwordsDoNotMatch: 'パスワードが一致しません',

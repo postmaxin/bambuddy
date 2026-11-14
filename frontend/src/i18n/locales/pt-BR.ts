@@ -3588,7 +3588,7 @@ export default {
     currentPassword: 'Senha Atual',
     currentPasswordPlaceholder: 'Digite a senha atual',
     newPassword: 'Nova Senha',
-    newPasswordPlaceholder: 'Digite a nova senha (mínimo 6 caracteres)',
+    newPasswordPlaceholder: 'Digite a nova senha',
     confirmPassword: 'Confirmar Senha',
     confirmPasswordPlaceholder: 'Confirme a nova senha',
     passwordsDoNotMatch: 'As senhas não coincidem',

@@ -3631,7 +3631,7 @@ export default {
     currentPassword: 'Huidig wachtwoord',
     currentPasswordPlaceholder: 'Voer huidig wachtwoord in',
     newPassword: 'Nieuw wachtwoord',
-    newPasswordPlaceholder: 'Voer nieuw wachtwoord in (min. 6 tekens)',
+    newPasswordPlaceholder: 'Voer nieuw wachtwoord in',
     confirmPassword: 'Nieuw wachtwoord bevestigen',
     confirmPasswordPlaceholder: 'Bevestig nieuw wachtwoord',
     passwordsDoNotMatch: 'Wachtwoorden komen niet overeen',

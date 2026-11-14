@@ -3601,7 +3601,7 @@ export default {
     currentPassword: 'Aktuelles Passwort',
     currentPasswordPlaceholder: 'Aktuelles Passwort eingeben',
     newPassword: 'Neues Passwort',
-    newPasswordPlaceholder: 'Neues Passwort eingeben (min. 6 Zeichen)',
+    newPasswordPlaceholder: 'Neues Passwort eingeben',
     confirmPassword: 'Neues Passwort bestätigen',
     confirmPasswordPlaceholder: 'Neues Passwort bestätigen',
     passwordsDoNotMatch: 'Passwörter stimmen nicht überein',

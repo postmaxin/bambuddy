@@ -3604,7 +3604,7 @@ export default {
     currentPassword: 'Mevcut Parola',
     currentPasswordPlaceholder: 'Mevcut parolayı girin',
     newPassword: 'Yeni Parola',
-    newPasswordPlaceholder: 'Yeni parolayı girin (en az 6 karakter)',
+    newPasswordPlaceholder: 'Yeni parola girin',
     confirmPassword: 'Yeni Parolayı Onayla',
     confirmPasswordPlaceholder: 'Yeni parolayı onayla',
     passwordsDoNotMatch: 'Parolalar eşleşmiyor',
