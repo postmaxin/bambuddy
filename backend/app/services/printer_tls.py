@@ -12,7 +12,8 @@ Two things about Bambu's certificates rule out the usual checks:
 
 * The leaf has no subjectAltName, only ``CN=<printer serial>``, and printers
   are reached by IP address, so hostname checking is off. In ``serial`` mode the
-  CN is compared with the serial Bambuddy has stored for that address instead.
+  CN is compared with the serial of the printer the caller is connecting to
+  instead.
 * ``BBL CA`` has no keyUsage extension and the leaf is X.509 v1, so
   ``VERIFY_X509_STRICT`` (on by default since Python 3.13) would refuse a real
   printer. It is cleared; chain, signatures and validity dates are still
@@ -21,10 +22,18 @@ Two things about Bambu's certificates rule out the usual checks:
 ``PRINTER_TLS_VERIFY`` selects the mode:
 
 * ``serial`` (default): the chain must lead to a Bambu CA, and the leaf's CN
-  must match the printer's serial when Bambuddy knows the serial for that
-  address (see :func:`register_printer`).
+  must match ``expected_serial``.
 * ``ca``: the chain must lead to a Bambu CA; the serial is not compared.
 * ``off``: no verification, as before this module existed.
+
+Every caller passes the serial explicitly (:func:`printer_ssl_context`): a
+saved printer's own ``serial_number``, or for a probe of unsaved settings the
+serial the user typed. There is no lookup by address, so a printer that is
+saved but not connected is checked like any other, and nothing a probe or a
+stale address does can change what another connection expects. ``None``
+means the chain check alone; no connection to a saved printer passes it (every
+saved printer has a serial), and the test suite checks that each call names
+the serial.
 
 ``PRINTER_TLS_EXTRA_CA_FILE`` adds a PEM file of further CAs, for a model whose
 chain is not in the shipped bundle yet.
@@ -52,7 +61,6 @@ CA_BUNDLE = Path(__file__).resolve().parent.parent / "data" / "bambu_printer_ca.
 _LOG_INTERVAL_SECONDS = 600.0
 
 _lock = threading.Lock()
-_serial_by_host: dict[str, str] = {}
 _last_logged: dict[tuple[str, str], float] = {}
 
 
@@ -62,28 +70,6 @@ class PrinterCertificateError(ssl.SSLCertVerificationError):
 
 def _normalize_serial(serial: str) -> str:
     return serial.strip().upper()
-
-
-def register_printer(host: str, serial: str | None) -> None:
-    """Record the serial of the printer configured at ``host``.
-
-    Called with a saved printer's configuration (``PrinterManager.connect_printer``),
-    so connections to that address (FTP, camera, proxy) can check the
-    certificate's CN against it. Probes of unsaved settings must not call this:
-    they pass ``expected_serial`` to :func:`printer_ssl_context` instead.
-    """
-    if not host or not serial or not serial.strip():
-        return
-    with _lock:
-        _serial_by_host[host] = _normalize_serial(serial)
-
-
-def expected_serial(host: str | None) -> str | None:
-    """The serial registered for ``host``, or None if none is known."""
-    if not host:
-        return None
-    with _lock:
-        return _serial_by_host.get(host)
 
 
 def _hint(serial_mismatch: bool) -> str:
@@ -135,7 +121,7 @@ def _check_handshake(conn: ssl.SSLSocket | ssl.SSLObject) -> None:
     context = conn.context
     if not isinstance(context, _PrinterSSLContext) or not context.check_serial:
         return
-    want = context.expected_serial or expected_serial(conn.server_hostname)
+    want = context.expected_serial
     if want is None:
         return
     cert = conn.getpeercert()
@@ -143,7 +129,7 @@ def _check_handshake(conn: ssl.SSLSocket | ssl.SSLObject) -> None:
     if got is None or _normalize_serial(got) != want:
         raise _fail(
             conn,
-            f"the certificate is for serial {got or '(none)'}, but the printer configured at this address is {want}",
+            f"the certificate is for serial {got or '(none)'}, but Bambuddy expected printer {want}",
             serial_mismatch=True,
         )
 
@@ -192,12 +178,14 @@ class _PrinterSSLContext(ssl.SSLContext):
     expected_serial: str | None = None
 
 
-def printer_ssl_context(mode: TlsVerifyMode | None = None, *, expected_serial: str | None = None) -> ssl.SSLContext:
+def printer_ssl_context(*, expected_serial: str | None, mode: TlsVerifyMode | None = None) -> ssl.SSLContext:
     """A client context for a connection to a printer, verifying it per ``mode``.
 
-    ``mode`` defaults to the ``PRINTER_TLS_VERIFY`` setting. ``expected_serial``,
-    when given, is the serial this connection expects in ``serial`` mode; without
-    it the serial registered for the address (if any) is used. Callers add their own
+    ``mode`` defaults to the ``PRINTER_TLS_VERIFY`` setting. ``expected_serial``
+    is the serial of the printer this connection is for, compared with the
+    certificate's CN in ``serial`` mode. It is required so that no call site can
+    leave it out by accident: ``None`` (or blank) means the chain check alone,
+    and a caller passing it says why. Callers add their own
     protocol-version and cipher adjustments to the returned context; this only
     decides how the printer is verified.
     """

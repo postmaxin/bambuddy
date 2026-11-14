@@ -71,4 +71,5 @@ async def capture_detection_frame(printer_id: int, *, session_factory=async_sess
         access_code=printer.access_code,
         model=printer.model,
         timeout=timeout,
+        serial=printer.serial_number,
     )

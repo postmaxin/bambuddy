@@ -98,10 +98,10 @@ def _ftp(main_module, maker, monkeypatch, tmp_path, listing, *, state="RUNNING",
     monkeypatch.setattr(main_module, "_TIMELAPSE_BASELINE_REREAD_INTERVAL_SECONDS", 0.01)
     monkeypatch.setattr(main_module, "_TIMELAPSE_BASELINE_REREAD_MAX_ATTEMPTS", 20)
 
-    async def _list(ip, code, path, printer_model=None):
+    async def _list(ip, code, path, printer_model=None, serial=None):
         return (listing() or []) if path == "/timelapse" else []
 
-    async def _list_result(ip, code, path, timeout=30.0, socket_timeout=None, printer_model=None):
+    async def _list_result(ip, code, path, timeout=30.0, socket_timeout=None, printer_model=None, serial=None):
         if path != "/timelapse":
             return (others or {}).get(path, FileListResult(files=[], available=False, missing=True))
         files = listing()

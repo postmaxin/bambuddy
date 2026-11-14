@@ -48,6 +48,7 @@ def fake_printer():
         id=7,
         ip_address="192.0.2.7",
         access_code="x",
+        serial_number="01P00TEST000001",
         model="X1C",
         external_camera_enabled=False,
         external_camera_url=None,

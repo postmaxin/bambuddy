@@ -86,6 +86,8 @@ class TLSProxy:
         on_disconnect: Callable[[str], None] | None = None,
         bind_address: str = "0.0.0.0",  # nosec B104
         rewrite_ip: tuple[str, str] | None = None,
+        *,
+        expected_serial: str | None,
     ):
         """Initialize the TLS proxy.
 
@@ -103,11 +105,15 @@ class TLSProxy:
                 the printer's real IP with the proxy's bind IP in printer→client data.
                 This prevents the slicer from discovering the printer's real IP
                 in MQTT payloads (ip_addr, rtsp_url, etc.) and bypassing the proxy.
+            expected_serial: Serial of the target printer, which its certificate
+                must carry before the slicer's credentials are forwarded
+                (see printer_tls).
         """
         self.name = name
         self.listen_port = listen_port
         self.target_host = target_host
         self.target_port = target_port
+        self.expected_serial = expected_serial
         self.server_cert_path = server_cert_path
         self.server_key_path = server_key_path
         self.on_connect = on_connect
@@ -170,7 +176,7 @@ class TLSProxy:
         """Create SSL context for connecting to printer."""
         # Verifies the printer before the slicer's credentials are forwarded
         # (see printer_tls).
-        ctx = printer_ssl_context()
+        ctx = printer_ssl_context(expected_serial=self.expected_serial)
         ctx.minimum_version = ssl.TLSVersion.TLSv1_2
         # Bambu printers use plain RSA key exchange (no ECDHE/DHE),
         # which modern OpenSSL 3.x defaults exclude. Add them back.
@@ -793,11 +799,15 @@ class SlicerProxyManager:
         on_activity: Callable[[str, str], None] | None = None,
         bind_address: str = "0.0.0.0",  # nosec B104
         bind_identity: dict[str, str] | None = None,
+        *,
+        target_serial: str | None,
     ):
         """Initialize the slicer proxy manager.
 
         Args:
             target_host: Target printer IP address
+            target_serial: The target printer's saved serial; the proxies that
+                terminate TLS towards it check its certificate against this
             cert_path: Path to server certificate
             key_path: Path to server private key
             on_activity: Optional callback for activity logging (name, message)
@@ -808,6 +818,7 @@ class SlicerProxyManager:
                 This ensures the slicer sees the VP identity, not the real printer.
         """
         self.target_host = target_host
+        self.target_serial = target_serial
         self.cert_path = cert_path
         self.key_path = key_path
         self.on_activity = on_activity
@@ -922,6 +933,7 @@ class SlicerProxyManager:
             on_disconnect=lambda cid: self._log_activity("MQTT", f"disconnected: {cid}"),
             bind_address=self.bind_address,
             rewrite_ip=(self.target_host, self.bind_address) if self.bind_address != "0.0.0.0" else None,  # nosec B104
+            expected_serial=self.target_serial,
         )
 
         # File transfer — raw TCP pass-through (port 6000)
@@ -992,6 +1004,7 @@ class SlicerProxyManager:
                         on_connect=lambda cid: self._log_activity("Bind", f"connected: {cid}"),
                         on_disconnect=lambda cid: self._log_activity("Bind", f"disconnected: {cid}"),
                         bind_address=self.bind_address,
+                        expected_serial=self.target_serial,
                     )
                 else:
                     proxy = TCPProxy(

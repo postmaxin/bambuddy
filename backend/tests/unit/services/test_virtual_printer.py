@@ -4153,6 +4153,7 @@ class TestSlicerProxyManager:
             target_host="192.168.1.100",
             cert_path=cert_path,
             key_path=key_path,
+            target_serial=None,
         )
 
     def test_proxy_manager_initializes_ports(self, proxy_manager):
@@ -4210,6 +4211,7 @@ class TestSlicerProxyManager:
             cert_path=cert_path,
             key_path=key_path,
             bind_address="10.0.0.1",
+            target_serial="01P00TARGET0001",
         )
 
         # Mock asyncio.create_task and asyncio.gather to prevent actual
@@ -4236,6 +4238,8 @@ class TestSlicerProxyManager:
 
         # MQTT should be TLSProxy (TLS-terminated for IP rewriting)
         assert isinstance(mgr._mqtt_proxy, TLSProxy), "MQTT should be TLSProxy (TLS-terminated)"
+        # It forwards the slicer's login only to the target printer (#8).
+        assert mgr._mqtt_proxy.expected_serial == "01P00TARGET0001"
 
         # Auxiliary ports (2024-2026) should be TCPProxy (transparent)
         assert len(mgr._aux_proxies) == 3, "Should have 3 aux port proxies"
@@ -4274,6 +4278,7 @@ class TestSlicerProxyManager:
             cert_path=cert_path,
             key_path=key_path,
             bind_address="10.0.0.1",
+            target_serial=None,
         )
 
         # Before start, proxies are None — verify constructor stores rewrite config

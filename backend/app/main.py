@@ -3973,7 +3973,11 @@ async def _capture_snapshot_frame(printer_id: int, printer, logger) -> bytes | N
         from backend.app.services.camera import capture_camera_frame_bytes
 
         frame_data = await capture_camera_frame_bytes(
-            printer.ip_address, printer.access_code, printer.model, timeout=15
+            printer.ip_address,
+            printer.access_code,
+            printer.model,
+            timeout=15,
+            serial=printer.serial_number,
         )
         if frame_data and len(frame_data) <= 2_500_000:
             logger.info("[SNAPSHOT] Fresh camera frame: %s bytes", len(frame_data))
@@ -4557,6 +4561,7 @@ def _schedule_fallback_3mf_retry(
                 printer_ip = printer.ip_address
                 printer_code = printer.access_code
                 printer_model = printer.model
+                printer_serial = printer.serial_number
 
             # Someone else may have fetched it in the meantime — the cover
             # endpoint routinely does, and its copy is the same bytes.
@@ -4596,6 +4601,7 @@ def _schedule_fallback_3mf_retry(
                         socket_timeout=ftp_timeout,
                         printer_model=printer_model,
                         max_total_timeout=RECOVERY_DOWNLOAD_MAX_TIMEOUT,
+                        serial=printer_serial,
                     )
                 except Exception as e:
                     logger.debug("[RECOVER] Retry download of %s failed: %s", name, e)
@@ -5143,6 +5149,7 @@ async def on_print_start(printer_id: int, data: dict):
                         use_external=printer.external_camera_enabled,
                         roi=roi,
                         external_camera_snapshot_url=printer.external_camera_snapshot_url,
+                        serial=printer.serial_number,
                     )
 
                     # No reference to compare against is a check that did not
@@ -5978,6 +5985,7 @@ async def on_print_start(printer_id: int, data: dict):
                         probe_path,
                         socket_timeout=ftp_timeout,
                         printer_model=printer.model,
+                        serial=printer.serial_number,
                     )
                 except Exception as e:
                     logger.debug("3MF probe for %s failed: %s", storage.probe_filename, e)
@@ -6065,6 +6073,7 @@ async def on_print_start(printer_id: int, data: dict):
                             operation_name=f"Download 3MF from {remote_path}",
                             cooloff_ip=printer.ip_address,
                             non_retry_exceptions=(FileNotOnPrinterError,),
+                            serial=printer.serial_number,
                         )
                     else:
                         downloaded = await download_file_async(
@@ -6075,6 +6084,7 @@ async def on_print_start(printer_id: int, data: dict):
                             timeout=ftp_timeout,
                             socket_timeout=ftp_timeout,
                             printer_model=printer.model,
+                            serial=printer.serial_number,
                         )
                     if downloaded:
                         downloaded_filename = try_filename
@@ -6121,7 +6131,11 @@ async def on_print_start(printer_id: int, data: dict):
             for search_dir in search_dirs:
                 try:
                     dir_files = await list_files_async(
-                        printer.ip_address, printer.access_code, search_dir, printer_model=printer.model
+                        printer.ip_address,
+                        printer.access_code,
+                        search_dir,
+                        printer_model=printer.model,
+                        serial=printer.serial_number,
                     )
                 except Exception as e:
                     logger.debug("Failed to list %s: %s", search_dir, e)
@@ -6166,6 +6180,7 @@ async def on_print_start(printer_id: int, data: dict):
                             retry_delay=ftp_retry_delay,
                             operation_name=f"Download 3MF from {remote_full_path}",
                             cooloff_ip=printer.ip_address,
+                            serial=printer.serial_number,
                         )
                     else:
                         downloaded = await download_file_async(
@@ -6176,6 +6191,7 @@ async def on_print_start(printer_id: int, data: dict):
                             timeout=ftp_timeout,
                             socket_timeout=ftp_timeout,
                             printer_model=printer.model,
+                            serial=printer.serial_number,
                         )
                 except Exception as e:
                     logger.debug("Failed to download %s: %s", remote_full_path, e)
@@ -6281,6 +6297,7 @@ async def on_print_start(printer_id: int, data: dict):
                                         operation_name=f"Re-download 3MF from {remote_path}",
                                         cooloff_ip=printer.ip_address,
                                         non_retry_exceptions=(FileNotOnPrinterError,),
+                                        serial=printer.serial_number,
                                     )
                                 else:
                                     downloaded = await download_file_async(
@@ -6291,6 +6308,7 @@ async def on_print_start(printer_id: int, data: dict):
                                         timeout=ftp_timeout,
                                         socket_timeout=ftp_timeout,
                                         printer_model=printer.model,
+                                        serial=printer.serial_number,
                                     )
                                 if downloaded and peek_plate_index_in_3mf(retry_temp_path) == expected_plate:
                                     logger.info(
@@ -6826,7 +6844,11 @@ async def _read_timelapse_baseline(printer) -> tuple[set[str], bool]:
             # Below any path: every remaining one would fail the same way.
             return set(), False
         listing = await list_files_result_async(
-            ip_address, printer.access_code, timelapse_path, printer_model=printer.model
+            ip_address,
+            printer.access_code,
+            timelapse_path,
+            printer_model=printer.model,
+            serial=printer.serial_number,
         )
         if not (listing.available or listing.missing):
             read = False
@@ -6877,7 +6899,11 @@ async def _list_timelapse_videos(printer) -> tuple[list[dict], str | None]:
             return [], None
         try:
             found_files = await list_files_async(
-                printer.ip_address, printer.access_code, timelapse_path, printer_model=printer.model
+                printer.ip_address,
+                printer.access_code,
+                timelapse_path,
+                printer_model=printer.model,
+                serial=printer.serial_number,
             )
             if found_files:
                 video_files = [
@@ -7550,6 +7576,7 @@ async def _attach_first_unclaimed_timelapse(
             remote_path,
             printer_model=printer.model,
             expected_size=expected_size,
+            serial=printer.serial_number,
         )
     except DownloadDeadlineExceeded:
         # Too slow for its size this round; the printer keeps its copy.
@@ -7571,6 +7598,7 @@ async def _attach_first_unclaimed_timelapse(
         remote_path,
         len(timelapse_data),
         printer_model=printer.model,
+        serial=printer.serial_number,
     ):
         return False
 
@@ -7607,6 +7635,7 @@ async def _attach_first_unclaimed_timelapse(
         verified=expected_size is not None,
         printer_model=printer.model,
         printer_name=printer.name,
+        serial=printer.serial_number,
     )
     return True
 
@@ -8861,6 +8890,7 @@ async def on_finish_photo_moment(printer_id: int, data: dict):
                         access_code=printer.access_code,
                         model=printer.model,
                         timeout=15,
+                        serial=printer.serial_number,
                     )
                     if frame_bytes:
                         logger.info(
@@ -9180,6 +9210,7 @@ async def _cleanup_sd_card_after_print(
                                 printer.access_code,
                                 remote_path,
                                 printer_model=printer.model,
+                                serial=printer.serial_number,
                             )
                         except Exception as e:
                             delete_result = DeleteResult.FAILED
@@ -10495,6 +10526,7 @@ async def _close_out_print(printer_id: int, data: dict):
                                 model=printer.model,
                                 archive_dir=archive_dir,
                                 rotation=getattr(printer, "camera_rotation", 0),
+                                serial=printer.serial_number,
                             )
 
             # Write phase: attach the photo in a fresh short-lived session.

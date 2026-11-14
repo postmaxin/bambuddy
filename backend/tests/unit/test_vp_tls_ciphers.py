@@ -92,6 +92,7 @@ class TestTlsProxyServerCiphers:
             on_connect=lambda cid: None,
             on_disconnect=lambda cid: None,
             bind_address="127.0.0.1",
+            expected_serial=None,
         )
         ctx = proxy._create_server_ssl_context()
         _assert_required_ciphers(ctx, "tcp_proxy._create_server_ssl_context")
@@ -109,6 +110,7 @@ class TestTlsProxyServerCiphers:
             on_connect=lambda cid: None,
             on_disconnect=lambda cid: None,
             bind_address="127.0.0.1",
+            expected_serial=None,
         )
         ctx = proxy._create_client_ssl_context()
         _assert_required_ciphers(ctx, "tcp_proxy._create_client_ssl_context")

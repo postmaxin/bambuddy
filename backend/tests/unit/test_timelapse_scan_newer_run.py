@@ -74,7 +74,7 @@ async def test_the_poll_stops_once_a_newer_run_has_started(test_engine, tmp_path
 
     with _patches(main_module, maker, monkeypatch, tmp_path, lambda: []):
 
-        async def listing(_ip, _code, path, printer_model=None):
+        async def listing(_ip, _code, path, printer_model=None, serial=None):
             if path != "/timelapse":
                 return []
             rounds.append(path)

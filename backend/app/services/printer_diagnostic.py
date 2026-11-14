@@ -85,7 +85,9 @@ async def _check_port(ip: str, port: int, timeout: float = _PORT_PROBE_TIMEOUT) 
 check_port = _check_port
 
 
-async def _check_ftps_tls(ip: str, model: str | None, timeout: float = _PORT_PROBE_TIMEOUT) -> str:
+async def _check_ftps_tls(
+    ip: str, model: str | None, timeout: float = _PORT_PROBE_TIMEOUT, *, serial: str | None
+) -> str:
     """Probe port 990 the way the FTP client does, and say how far it got.
 
     Returns ``"ok"``, ``"closed"`` (nothing accepted the TCP connection),
@@ -104,8 +106,12 @@ async def _check_ftps_tls(ip: str, model: str | None, timeout: float = _PORT_PRO
     would also get through. Handshake only; no login is attempted, so this
     stays valid for the pre-save Add-Printer flow where no access code exists
     yet.
+
+    ``serial`` is the saved printer's serial, or in the Add-Printer flow the
+    one the user typed, so a pass also means the FTP client would accept this
+    printer's certificate.
     """
-    context = printer_ssl_context()
+    context = printer_ssl_context(expected_serial=serial)
     context.minimum_version = ssl.TLSVersion.TLSv1_2
     if get_ftp_profile(model).cap_tls_v1_2:
         context.maximum_version = ssl.TLSVersion.TLSv1_2
@@ -176,6 +182,7 @@ async def _last_print_file_is_reachable(
             timeout=_STORAGE_PROBE_TIMEOUT,
             socket_timeout=_STORAGE_PROBE_TIMEOUT,
             printer_model=getattr(printer, "model", None),
+            serial=getattr(printer, "serial_number", None),
         )
     except Exception as e:
         logger.debug("Could not probe %s for %s: %s", ip_address, verdict.probe_filename, e)
@@ -502,9 +509,11 @@ async def run_connection_diagnostic(
     # --- Port reachability (probed in parallel) ---
     progress["stage"] = "ports"
     camera_port, camera_protocol = _camera_port_for_printer(printer)
+    # The saved printer's serial, or the one typed into Add Printer.
+    expected_serial = getattr(printer, "serial_number", None) if printer else serial_number
     mqtt_ok, ftps_state, camera_ok = await asyncio.gather(
         _check_port(ip_address, PORT_MQTT),
-        _check_ftps_tls(ip_address, getattr(printer, "model", None) if printer else None),
+        _check_ftps_tls(ip_address, getattr(printer, "model", None) if printer else None, serial=expected_serial),
         _check_port(ip_address, camera_port),
     )
     # MQTT is connection-critical; FTPS/camera only degrade printing/camera.

@@ -165,6 +165,7 @@ class FirmwareUpdateService:
                     printer.ip_address,
                     printer.access_code,
                     printer_model=printer.model,
+                    serial=printer.serial_number,
                 )
                 if storage_info and "free_bytes" in storage_info:
                     result["sd_card_free_space"] = storage_info["free_bytes"]
@@ -286,6 +287,7 @@ class FirmwareUpdateService:
                 access_code=printer.access_code,
                 model=model,
                 target_version=target_version,
+                serial=printer.serial_number,
             ),
             name=f"firmware-upload-{printer_id}",
         )
@@ -299,6 +301,8 @@ class FirmwareUpdateService:
         access_code: str,
         model: str,
         target_version: str | None = None,
+        *,
+        serial: str | None = None,
     ):
         """Perform the actual firmware download and upload."""
         state = get_upload_state(printer_id)
@@ -363,6 +367,7 @@ class FirmwareUpdateService:
                     progress_callback=on_upload_progress,
                     socket_timeout=ftp_timeout,
                     printer_model=model,
+                    serial=serial,
                     # Someone pressed "update firmware" and is watching a
                     # progress bar. Bounded and user-initiated, like a print
                     # dispatch, so it does not spend its retries on a cool-off
@@ -382,6 +387,7 @@ class FirmwareUpdateService:
                     socket_timeout=ftp_timeout,
                     printer_model=model,
                     respect_handshake_cooloff=False,
+                    serial=serial,
                 )
 
             if not success:

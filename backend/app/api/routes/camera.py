@@ -237,6 +237,7 @@ async def generate_chamber_mjpeg_stream(
     stream_id: str | None = None,
     disconnect_event: asyncio.Event | None = None,
     printer_id: int | None = None,
+    serial: str | None = None,
 ) -> AsyncGenerator[bytes, None]:
     """Generate MJPEG stream from A1/P1 printer using chamber image protocol.
 
@@ -248,7 +249,7 @@ async def generate_chamber_mjpeg_stream(
     if stream_id and disconnect_event:
         _disconnect_events[stream_id] = disconnect_event
 
-    connection = await generate_chamber_image_stream(ip_address, access_code, fps)
+    connection = await generate_chamber_image_stream(ip_address, access_code, fps, serial=serial)
     if connection is None:
         logger.error("Failed to connect to chamber image stream for %s", ip_address)
         yield (
@@ -649,6 +650,7 @@ async def generate_rtsp_mjpeg_stream(
     stream_id: str | None = None,
     disconnect_event: asyncio.Event | None = None,
     printer_id: int | None = None,
+    serial: str | None = None,
 ) -> AsyncGenerator[bytes, None]:
     """Generate MJPEG stream from printer camera using ffmpeg/RTSP.
 
@@ -672,7 +674,7 @@ async def generate_rtsp_mjpeg_stream(
     # ffmpeg's GnuTLS.  This fixes P2S (and potentially other models)
     # dropping the RTSP session after a few seconds due to GnuTLS's
     # hardened Debian defaults rejecting TLS renegotiation.
-    proxy_port, proxy_server = await create_tls_proxy(ip_address, port, printer_ssl_context())
+    proxy_port, proxy_server = await create_tls_proxy(ip_address, port, printer_ssl_context(expected_serial=serial))
     camera_url = f"rtsp://bblp:{access_code}@127.0.0.1:{proxy_port}/streaming/live/1"
 
     # ffmpeg command to output MJPEG stream to stdout
@@ -1406,6 +1408,7 @@ async def camera_stream(
             stream_id=upstream_stream_id,
             disconnect_event=disconnect_event,
             printer_id=printer_id,
+            serial=printer.serial_number,
         )
 
     # Subscribe with a one-shot retry to close a tiny race: the grace-window
@@ -1671,6 +1674,7 @@ async def _snapshot_response(printer_id: int, printer: Printer) -> Response:
             model=printer.model,
             output_path=temp_path,
             timeout=15,
+            serial=printer.serial_number,
         )
 
         if not success:
@@ -1714,6 +1718,7 @@ async def test_camera(
         ip_address=printer.ip_address,
         access_code=printer.access_code,
         model=printer.model,
+        serial=printer.serial_number,
     )
 
     return result
@@ -1751,6 +1756,7 @@ async def diagnose_camera_route(
         printer_id=printer_id,
         has_live_stream=has_live,
         live_frame_age_seconds=live_age,
+        serial=printer.serial_number,
     )
     return result.to_dict()
 
@@ -1981,6 +1987,7 @@ async def check_plate_empty(
         use_external=use_external,
         roi=roi,
         external_camera_snapshot_url=printer.external_camera_snapshot_url if printer.external_camera_enabled else None,
+        serial=printer.serial_number,
     )
 
     # Get reference count for the response
@@ -2075,6 +2082,7 @@ async def calibrate_plate_detection(
         external_camera_type=printer.external_camera_type if printer.external_camera_enabled else None,
         use_external=use_external,
         external_camera_snapshot_url=printer.external_camera_snapshot_url if printer.external_camera_enabled else None,
+        serial=printer.serial_number,
     )
 
     if light_warning and success:

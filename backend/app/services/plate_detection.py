@@ -607,6 +607,8 @@ async def capture_camera_image(
     external_camera_type: str | None = None,
     use_external: bool = False,
     external_camera_snapshot_url: str | None = None,
+    *,
+    serial: str | None = None,
 ) -> tuple[bytes | None, str]:
     """Capture an image from the printer camera.
 
@@ -674,7 +676,9 @@ async def capture_camera_image(
             tmp_path.chmod(0o600)
 
             try:
-                success = await capture_camera_frame(ip_address, access_code, model, tmp_path, timeout=10)
+                success = await capture_camera_frame(
+                    ip_address, access_code, model, tmp_path, timeout=10, serial=serial
+                )
                 if success:
                     with open(tmp_path, "rb") as f:
                         image_data = f.read()
@@ -701,6 +705,8 @@ async def check_plate_empty(
     use_external: bool = False,
     roi: tuple[float, float, float, float] | None = None,
     external_camera_snapshot_url: str | None = None,
+    *,
+    serial: str | None = None,
 ) -> PlateDetectionResult:
     """Check if the build plate is empty for a printer.
 
@@ -737,6 +743,7 @@ async def check_plate_empty(
         external_camera_type,
         use_external,
         external_camera_snapshot_url=external_camera_snapshot_url,
+        serial=serial,
     )
 
     if image_data is None:
@@ -768,6 +775,8 @@ async def calibrate_plate(
     external_camera_type: str | None = None,
     use_external: bool = False,
     external_camera_snapshot_url: str | None = None,
+    *,
+    serial: str | None = None,
 ) -> tuple[bool, str, int]:
     """Calibrate plate detection by capturing a reference image of the empty plate.
 
@@ -796,6 +805,7 @@ async def calibrate_plate(
         external_camera_type,
         use_external,
         external_camera_snapshot_url=external_camera_snapshot_url,
+        serial=serial,
     )
 
     if image_data is None:

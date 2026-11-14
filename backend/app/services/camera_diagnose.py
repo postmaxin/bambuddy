@@ -172,6 +172,8 @@ async def _check_first_frame(
     access_code: str,
     model: str | None,
     timeout: int,
+    *,
+    serial: str | None = None,
 ) -> CameraDiagnoseStage:
     """Stage 2 — capture one frame end-to-end. Combines auth + protocol
     handshake + first keyframe; either it works or it doesn't."""
@@ -184,13 +186,14 @@ async def _check_first_frame(
     # and a pass would be claimed for a connection we never opened. So the
     # stage says so, the same way the live-stream shortcut above declares
     # itself instead of quietly passing.
-    coalesced = capture_in_flight(ip_address)
+    coalesced = capture_in_flight(ip_address, serial)
     try:
         jpeg = await capture_camera_frame_bytes(
             ip_address=ip_address,
             access_code=access_code,
             model=model,
             timeout=timeout,
+            serial=serial,
         )
     except Exception as exc:  # noqa: BLE001 — see camera_profiles.py rationale
         # capture_camera_frame_bytes can raise from many layers (ffmpeg
@@ -250,6 +253,7 @@ async def diagnose_camera(
     live_frame_age_seconds: float | None = None,
     tcp_timeout: float = 3.0,
     capture_timeout: int = 15,
+    serial: str | None = None,
 ) -> CameraDiagnoseResult:
     """Run the camera diagnostic and return a structured result.
 
@@ -303,7 +307,7 @@ async def diagnose_camera(
         return result
 
     # Stage 2
-    frame_stage = await _check_first_frame(ip_address, access_code, model, capture_timeout)
+    frame_stage = await _check_first_frame(ip_address, access_code, model, capture_timeout, serial=serial)
     result.stages.append(frame_stage)
     if frame_stage.status != "ok":
         result.overall_status = "failed"
