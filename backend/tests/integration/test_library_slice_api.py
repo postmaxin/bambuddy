@@ -21,14 +21,59 @@ from collections.abc import Callable
 import httpx
 import pytest
 from httpx import AsyncClient
+from sqlalchemy import event
+from sqlalchemy.ext.asyncio import create_async_engine
 
 from backend.app.api.routes.library import _slicer_rejection_message
 from backend.app.core.config import settings as app_settings
+from backend.app.core.database import Base
 from backend.app.models.library import LibraryFile
 from backend.app.models.local_preset import LocalPreset
 from backend.app.models.settings import Settings as SettingsModel
 from backend.app.services import slicer_api as slicer_api_module
 from backend.app.services.slice_dispatch import slice_dispatch
+
+# ---------------------------------------------------------------------------
+# Fixtures
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture
+async def test_engine(test_engine, tmp_path):
+    """A file-backed SQLite database for this module (#6).
+
+    The suite's default ``sqlite:///:memory:`` engine is a StaticPool: every
+    session (the test's, each request's, the slice job's) shares ONE
+    connection and so one transaction. A slice job runs in the background
+    while the test polls ``GET /slice-jobs/{id}``, so another session's
+    rollback or close can land between the job's INSERT and its COMMIT and
+    discard the row. The job then answers with an archive id that does not
+    exist: ``refresh()`` raises "Could not refresh instance" and a test that
+    reads the row back gets None. Counting rows right after the job's
+    ``commit()`` found 0 in 17 of 36 jobs on a loaded machine. Production
+    gives each session its own connection, so this is a harness artifact,
+    not an app bug. Separate connections to a file database behave like
+    production.
+    """
+    if test_engine.url.get_backend_name() != "sqlite" or test_engine.url.database != ":memory:":
+        yield test_engine  # PostgreSQL: already one connection per session
+        return
+
+    engine = create_async_engine(f"sqlite+aiosqlite:///{tmp_path / 'slice.db'}", connect_args={"timeout": 30})
+
+    @event.listens_for(engine.sync_engine, "connect")
+    def _fast_and_concurrent(dbapi_conn, _record):
+        cur = dbapi_conn.cursor()
+        cur.execute("PRAGMA journal_mode=WAL")  # readers don't block the job's writer
+        cur.execute("PRAGMA synchronous=OFF")  # throwaway database: skip fsync
+        cur.close()
+
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+    yield engine
+    await engine.dispose()
+    await asyncio.sleep(0.1)  # let aiosqlite's worker thread finish before the loop closes
+
 
 # ---------------------------------------------------------------------------
 # Helpers
