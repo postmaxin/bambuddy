@@ -23,6 +23,11 @@ class TestUnmetPasswordRules:
     def test_valid_password_has_no_unmet_rules(self):
         assert unmet_password_rules("Aa1!aaaa") == []
 
+    def test_length_counts_code_points_and_digits_are_unicode(self):
+        # The frontend checklist mirrors these two behaviours (fork #9 review).
+        assert unmet_password_rules("Aa1!ab😀") == ["min_length"]
+        assert unmet_password_rules("Aa!aaaa١") == []
+
     def test_message_names_every_unmet_rule(self):
         message = password_complexity_message(["uppercase", "digit"])
         assert message == "Password must contain an uppercase letter and contain a digit"

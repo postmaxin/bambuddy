@@ -57,6 +57,8 @@ export default {
     lowercase: '一个小写字母',
     digit: '一个数字',
     special: '一个特殊字符',
+    met: '已满足',
+    unmet: '未满足',
   },
   common: {
     secretKept: '已保存。保持不变即可保留，或输入新值。',

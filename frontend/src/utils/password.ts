@@ -16,16 +16,20 @@ export type PasswordRequirementKey =
 
 export const PASSWORD_MIN_LENGTH = 8;
 
+// Python counts code points and its `\d` matches any Unicode decimal digit
+// (category Nd); mirror both so the checklist agrees with the server.
+const codePointLength = (p: string) => Array.from(p).length;
+
 /** Display order; each rule's i18n label lives at `passwordRules.<labelKey>`. */
 export const PASSWORD_RULES: ReadonlyArray<{
   key: PasswordRequirementKey;
   labelKey: 'minLength' | 'uppercase' | 'lowercase' | 'digit' | 'special';
   test: (password: string) => boolean;
 }> = [
-  { key: 'tooShort', labelKey: 'minLength', test: (p) => p.length >= PASSWORD_MIN_LENGTH },
+  { key: 'tooShort', labelKey: 'minLength', test: (p) => codePointLength(p) >= PASSWORD_MIN_LENGTH },
   { key: 'needsUppercase', labelKey: 'uppercase', test: (p) => /[A-Z]/.test(p) },
   { key: 'needsLowercase', labelKey: 'lowercase', test: (p) => /[a-z]/.test(p) },
-  { key: 'needsDigit', labelKey: 'digit', test: (p) => /\d/.test(p) },
+  { key: 'needsDigit', labelKey: 'digit', test: (p) => /\p{Nd}/u.test(p) },
   { key: 'needsSpecial', labelKey: 'special', test: (p) => /[^A-Za-z0-9]/.test(p) },
 ];
 

@@ -34,6 +34,17 @@ describe('getUnmetPasswordRules', () => {
   });
 });
 
+describe('server parity for non-ASCII input', () => {
+  it('counts code points, not UTF-16 units (an emoji is one character)', () => {
+    // 7 code points, 8 UTF-16 units: the server rejects it as too short.
+    expect(getUnmetPasswordRules('Aa1!ab😀')).toEqual(['tooShort']);
+  });
+
+  it('accepts any Unicode decimal digit, like the server', () => {
+    expect(getUnmetPasswordRules('Aa!aaaa١')).toEqual([]);
+  });
+});
+
 describe('isPasswordValid', () => {
   it('is true only when no rule is unmet', () => {
     expect(isPasswordValid('Aa1!aaaa')).toBe(true);

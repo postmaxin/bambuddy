@@ -23,6 +23,12 @@ describe('PasswordRules', () => {
     expect(met('needsSpecial')).toBe('false');
   });
 
+  it('exposes each rule status as text for screen readers', () => {
+    render(<PasswordRules password="abcdefgh" />);
+    expect(screen.getByTestId('password-rule-needsLowercase')).toHaveTextContent('Met');
+    expect(screen.getByTestId('password-rule-needsUppercase')).toHaveTextContent('Not met');
+  });
+
   it('ticks everything for a valid password', () => {
     render(<PasswordRules password="Aa1!aaaa" />);
     for (const key of ['tooShort', 'needsUppercase', 'needsLowercase', 'needsDigit', 'needsSpecial']) {

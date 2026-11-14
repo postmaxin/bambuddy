@@ -57,6 +57,8 @@ export default {
     lowercase: 'Une lettre minuscule',
     digit: 'Un chiffre',
     special: 'Un caractère spécial',
+    met: 'Respecté',
+    unmet: 'Non respecté',
   },
   common: {
     secretKept: 'Enregistré. Laissez tel quel pour le conserver, ou saisissez une nouvelle valeur.',

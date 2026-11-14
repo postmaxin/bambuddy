@@ -57,6 +57,8 @@ export default {
     lowercase: 'A lowercase letter',
     digit: 'A digit',
     special: 'A special character',
+    met: 'Met',
+    unmet: 'Not met',
   },
   common: {
     secretKept: 'Saved. Leave it as is to keep it, or enter a new value.',

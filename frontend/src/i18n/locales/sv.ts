@@ -57,6 +57,8 @@ export default {
     lowercase: 'En gemen',
     digit: 'En siffra',
     special: 'Ett specialtecken',
+    met: 'Uppfyllt',
+    unmet: 'Ej uppfyllt',
   },
   common: {
     secretKept: 'Sparat. Lämna det som det är för att behålla det, eller ange ett nytt värde.',

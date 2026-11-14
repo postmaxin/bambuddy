@@ -57,6 +57,8 @@ export default {
     lowercase: '小文字',
     digit: '数字',
     special: '記号',
+    met: '満たしています',
+    unmet: '満たしていません',
   },
   common: {
     secretKept: '保存済みです。そのままにすると維持され、新しい値を入力すると置き換わります。',

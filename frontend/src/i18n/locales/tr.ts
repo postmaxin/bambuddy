@@ -57,6 +57,8 @@ export default {
     lowercase: 'Bir küçük harf',
     digit: 'Bir rakam',
     special: 'Bir özel karakter',
+    met: 'Karşılandı',
+    unmet: 'Karşılanmadı',
   },
   common: {
     secretKept: 'Kaydedildi. Korumak için olduğu gibi bırakın veya yeni bir değer girin.',

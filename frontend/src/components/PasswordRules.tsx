@@ -23,6 +23,7 @@ export function PasswordRules({ password, className = '' }: { password: string; 
             >
               {met ? <Check className="w-3 h-3" aria-hidden="true" /> : <Circle className="w-3 h-3" aria-hidden="true" />}
               {t(`passwordRules.${rule.labelKey}`)}
+              <span className="sr-only">{met ? t('passwordRules.met') : t('passwordRules.unmet')}</span>
             </li>
           );
         })}

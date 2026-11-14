@@ -57,6 +57,8 @@ export default {
     lowercase: 'Een kleine letter',
     digit: 'Een cijfer',
     special: 'Een speciaal teken',
+    met: 'Voldaan',
+    unmet: 'Niet voldaan',
   },
   common: {
     secretKept: 'Opgeslagen. Laat het zo om het te behouden, of voer een nieuwe waarde in.',

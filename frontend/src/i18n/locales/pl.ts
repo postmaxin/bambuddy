@@ -57,6 +57,8 @@ export default {
     lowercase: 'Małą literę',
     digit: 'Cyfrę',
     special: 'Znak specjalny',
+    met: 'Spełnione',
+    unmet: 'Niespełnione',
   },
   common: {
     secretKept: 'Zapisano. Pozostaw bez zmian, aby zachować, lub wpisz nową wartość.',

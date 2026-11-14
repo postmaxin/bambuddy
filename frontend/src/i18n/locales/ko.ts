@@ -54,6 +54,8 @@ export default {
     lowercase: '소문자',
     digit: '숫자',
     special: '특수문자',
+    met: '충족됨',
+    unmet: '충족되지 않음',
   },
   common: {
     secretKept: '저장되어 있습니다. 그대로 두면 유지되고, 새 값을 입력하면 바뀝니다.',
