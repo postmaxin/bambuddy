@@ -222,3 +222,115 @@ async def test_backup_export_select_keeps_ciphertext(test_engine, printer_factor
     assert stored_rows[0]["access_code"] == stored
     assert stored_rows[0]["access_code"].startswith("fernet:")
     assert list(stored_rows[0].keys()) == list(plain_rows[0].keys())
+
+
+LEGACY_VP_CODE = "LEGACYVP"
+
+
+async def _seed_legacy_vp_settings(engine, *, with_flag: bool = False) -> None:
+    """The settings rows the old single-virtual-printer UI left behind."""
+    rows = {
+        "virtual_printer_enabled": "false",
+        "virtual_printer_access_code": LEGACY_VP_CODE,
+        "virtual_printer_mode": "archive",
+    }
+    if with_flag:
+        rows["_migrate_single_virtual_printer_done"] = "true"
+    async with engine.begin() as conn:
+        for key, value in rows.items():
+            await conn.execute(text('INSERT INTO settings ("key", value) VALUES (:k, :v)'), {"k": key, "v": value})
+
+
+async def _legacy_vp_setting(engine) -> str | None:
+    async with engine.connect() as conn:
+        result = await conn.execute(text("SELECT value FROM settings WHERE key = 'virtual_printer_access_code'"))
+        return result.scalar()
+
+
+async def _raw_everything(engine) -> str:
+    """Every stored value of the tables that could hold a copy of the code."""
+    async with engine.connect() as conn:
+        settings = (await conn.execute(text("SELECT key, value FROM settings"))).all()
+        vps = (await conn.execute(text("SELECT access_code FROM virtual_printers"))).all()
+    return repr(settings) + repr(vps)
+
+
+def _follow_engine(test_engine, monkeypatch):
+    from backend.app.core import database as database_module, db_dialect
+
+    on_sqlite = test_engine.dialect.name == "sqlite"
+    monkeypatch.setattr(db_dialect, "is_sqlite", lambda: on_sqlite)
+    monkeypatch.setattr(database_module, "is_sqlite", lambda: on_sqlite)
+    maker = async_sessionmaker(test_engine, class_=AsyncSession, expire_on_commit=False)
+    monkeypatch.setattr(database_module, "async_session", maker)
+    return maker
+
+
+@pytest.mark.asyncio
+async def test_legacy_vp_setting_is_migrated_then_leaves_no_plaintext(test_engine, monkeypatch):
+    """The legacy settings row is only a migration source: its code moves into
+    the virtual printer, encrypted, and the settings copy is gone (#4)."""
+    from backend.app.core.database import run_migrations
+
+    maker = _follow_engine(test_engine, monkeypatch)
+    await _seed_legacy_vp_settings(test_engine)
+
+    async with test_engine.begin() as conn:
+        await run_migrations(conn)
+    await _migrate_encrypt_legacy_secrets()  # init_db runs this right after run_migrations
+
+    assert await _legacy_vp_setting(test_engine) is None
+    raw = await _raw(test_engine, "virtual_printers", 1)
+    assert raw.startswith("fernet:")
+    assert LEGACY_VP_CODE not in await _raw_everything(test_engine)
+    async with maker() as s:
+        assert (await s.get(VirtualPrinter, 1)).access_code == LEGACY_VP_CODE  # reads still work
+
+
+@pytest.mark.asyncio
+async def test_legacy_vp_setting_is_dropped_when_virtual_printers_already_exist(test_engine, monkeypatch):
+    """Upgraded installs migrated long ago still hold the row; it goes too."""
+    from backend.app.core.database import run_migrations
+
+    _follow_engine(test_engine, monkeypatch)
+    await _seed_legacy_vp_settings(test_engine, with_flag=True)
+
+    async with test_engine.begin() as conn:
+        await run_migrations(conn)
+
+    assert await _legacy_vp_setting(test_engine) is None
+    assert LEGACY_VP_CODE not in await _raw_everything(test_engine)
+
+
+@pytest.mark.asyncio
+async def test_legacy_vp_setting_without_key_still_migrates_as_plaintext(test_engine, monkeypatch):
+    """With no encryption key nothing is encrypted, as before; the code still
+    reaches the virtual printer and the settings copy is still removed."""
+    from backend.app.core.database import run_migrations
+
+    maker = _follow_engine(test_engine, monkeypatch)
+    _no_key(monkeypatch)
+    await _seed_legacy_vp_settings(test_engine)
+
+    async with test_engine.begin() as conn:
+        await run_migrations(conn)
+    await _migrate_encrypt_legacy_secrets()  # no-op without a key
+
+    assert await _legacy_vp_setting(test_engine) is None
+    assert await _raw(test_engine, "virtual_printers", 1) == LEGACY_VP_CODE
+    async with maker() as s:
+        assert (await s.get(VirtualPrinter, 1)).access_code == LEGACY_VP_CODE
+
+
+@pytest.mark.asyncio
+async def test_unrelated_settings_survive_the_legacy_cleanup(test_engine, monkeypatch):
+    from backend.app.core.database import run_migrations
+
+    _follow_engine(test_engine, monkeypatch)
+    await _seed_legacy_vp_settings(test_engine)
+    async with test_engine.begin() as conn:
+        await run_migrations(conn)
+
+    async with test_engine.connect() as conn:
+        mode = (await conn.execute(text("SELECT value FROM settings WHERE key = 'virtual_printer_mode'"))).scalar()
+    assert mode == "archive"
