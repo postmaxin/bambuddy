@@ -12,6 +12,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from backend.app.models.printer import Printer
 from backend.app.models.settings import Settings
 from backend.app.models.user import User
 from backend.app.services.github_backup import GitHubBackupService
@@ -507,3 +508,34 @@ class TestSettingsFallbackIsStillHonoured:
             _bambu, orca = await service.cloud_accounts(db_session)
 
         assert orca == [("global", None)]
+
+
+class TestKProfileCollectionOnRestrictedPrinters:
+    """A cloud-mode printer answers extrusion_cali_get with an HMS alert."""
+
+    async def _collect(self, service, db_session, *, accepts, trigger):
+        db_session.add(Printer(name="P1S", serial_number="KP-RESTRICT-1", ip_address="192.0.2.9", access_code="x"))
+        await db_session.commit()
+        client = MagicMock()
+        client.state.connected = True
+        client.accepts_unsigned_commands.return_value = accepts
+        client.get_kprofiles = AsyncMock(return_value=[])
+        with patch("backend.app.services.github_backup.printer_manager") as pm:
+            pm.get_client.return_value = client
+            await service._collect_kprofiles(db_session, {}, trigger=trigger)
+        return client
+
+    @pytest.mark.asyncio
+    async def test_scheduled_backup_skips_restricted_printer(self, service, db_session):
+        client = await self._collect(service, db_session, accepts=False, trigger="scheduled")
+        client.get_kprofiles.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_manual_backup_still_asks_restricted_printer(self, service, db_session):
+        client = await self._collect(service, db_session, accepts=False, trigger="manual")
+        assert client.get_kprofiles.await_count == 4
+
+    @pytest.mark.asyncio
+    async def test_scheduled_backup_asks_unrestricted_printer(self, service, db_session):
+        client = await self._collect(service, db_session, accepts=True, trigger="scheduled")
+        assert client.get_kprofiles.await_count == 4
