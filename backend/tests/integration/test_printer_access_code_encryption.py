@@ -288,18 +288,33 @@ async def test_legacy_vp_setting_is_migrated_then_leaves_no_plaintext(test_engin
 
 
 @pytest.mark.asyncio
-async def test_legacy_vp_setting_is_dropped_when_virtual_printers_already_exist(test_engine, monkeypatch):
-    """Upgraded installs migrated long ago still hold the row; it goes too."""
+@pytest.mark.parametrize("with_flag", [False, True])
+async def test_legacy_vp_setting_is_dropped_when_virtual_printers_already_exist(test_engine, monkeypatch, with_flag):
+    """Upgraded installs migrated long ago still hold the row; it goes too, with
+    or without the done-flag, and the existing virtual printer keeps its code."""
     from backend.app.core.database import run_migrations
 
-    _follow_engine(test_engine, monkeypatch)
-    await _seed_legacy_vp_settings(test_engine, with_flag=True)
+    maker = _follow_engine(test_engine, monkeypatch)
+    await _seed_legacy_vp_settings(test_engine, with_flag=with_flag)
+    async with maker() as s:
+        s.add(
+            VirtualPrinter(
+                id=1, name="VP", enabled=False, mode="queue", access_code="OWNVPCDE", serial_suffix="391800001"
+            )
+        )
+        await s.commit()
+    stored = await _raw(test_engine, "virtual_printers", 1)
 
     async with test_engine.begin() as conn:
         await run_migrations(conn)
 
     assert await _legacy_vp_setting(test_engine) is None
     assert LEGACY_VP_CODE not in await _raw_everything(test_engine)
+    assert await _raw(test_engine, "virtual_printers", 1) == stored
+    async with maker() as s:
+        assert (await s.get(VirtualPrinter, 1)).access_code == "OWNVPCDE"
+        count = (await s.execute(text("SELECT COUNT(*) FROM virtual_printers"))).scalar()
+    assert count == 1  # the legacy row was not turned into a second virtual printer
 
 
 @pytest.mark.asyncio
