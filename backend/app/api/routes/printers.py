@@ -1515,6 +1515,7 @@ async def _produce_cover_image(
                     remote_paths,
                     temp_path,
                     printer_model=printer.model,
+                    serial=printer.serial_number,
                 )
                 if downloaded:
                     break
@@ -1714,6 +1715,7 @@ async def list_printer_files(
         printer.access_code,
         path,
         printer_model=printer.model,
+        serial=printer.serial_number,
     )
     files = listing.files
 
@@ -1806,6 +1808,7 @@ async def _download_printer_file_bytes(printer, path: str) -> bytes:
                 # the file browser's budget: print start's 300 s ceiling would
                 # add none.
                 max_total_timeout=MAX_PRINTER_ZIP_PREPARE_SECONDS,
+                serial=printer.serial_number,
             )
         except FileNotOnPrinterError as exc:
             raise HTTPException(404, f"File not found: {path}") from exc
@@ -2259,7 +2262,9 @@ async def delete_printer_file(
 
     from backend.app.services.bambu_ftp import DeleteResult
 
-    result = await delete_file_async(printer.ip_address, printer.access_code, path, printer_model=printer.model)
+    result = await delete_file_async(
+        printer.ip_address, printer.access_code, path, printer_model=printer.model, serial=printer.serial_number
+    )
     if result != DeleteResult.FAILED:
         # Gone from the printer: a preview must not be served from the old copy.
         printer_file_cache.forget(printer_id, path)
@@ -2279,7 +2284,9 @@ async def get_printer_storage(
     """Get storage information from the printer."""
     printer = await _load_printer_or_404(printer_id)
 
-    storage_info = await get_storage_info_async(printer.ip_address, printer.access_code, printer_model=printer.model)
+    storage_info = await get_storage_info_async(
+        printer.ip_address, printer.access_code, printer_model=printer.model, serial=printer.serial_number
+    )
 
     return storage_info or {"used_bytes": None, "free_bytes": None}
 
@@ -4369,6 +4376,7 @@ async def get_printable_objects(
                     remote_paths,
                     temp_path,
                     printer_model=printer.model,
+                    serial=printer.serial_number,
                 )
                 if downloaded and temp_path.exists():
                     with open(temp_path, "rb") as f:

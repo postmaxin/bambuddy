@@ -402,6 +402,7 @@ async def build_printer_files_zip(
                         # nothing else should be made to wait that out; equally,
                         # each file here must not stall behind a thumbnail.
                         serialize=False,
+                        serial=printer.serial_number,
                     )
                     if not downloaded:
                         failed_paths.append(remote_path)
@@ -532,6 +533,7 @@ async def build_printer_file(
             # The lock-free promise in this function's docstring, kept: a preview
             # must not queue behind somebody else's selection (#2957).
             serialize=False,
+            serial=printer.serial_number,
         )
         if not downloaded:
             raise PrinterFileDownloadError("The selected printer file could not be downloaded")

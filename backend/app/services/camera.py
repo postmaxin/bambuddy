@@ -18,7 +18,7 @@ import weakref
 from datetime import datetime
 from pathlib import Path
 
-from backend.app.services.printer_tls import printer_ssl_context
+from backend.app.services.printer_tls import PrinterCertificateError, printer_ssl_context
 from backend.app.utils.ffmpeg_output import (
     FFMPEG_RTSP_LOGLEVEL,
     NO_FFMPEG_OUTPUT,
@@ -448,18 +448,21 @@ def _create_chamber_auth_payload(access_code: str) -> bytes:
     return payload
 
 
-def _create_ssl_context() -> ssl.SSLContext:
+def _create_ssl_context(serial: str | None) -> ssl.SSLContext:
     """Create an SSL context for chamber image connection.
 
-    The printer is verified before the access code goes out (see printer_tls).
+    The printer is verified, and checked to be the one with ``serial``, before
+    the access code goes out (see printer_tls).
     """
-    return printer_ssl_context()
+    return printer_ssl_context(expected_serial=serial)
 
 
 async def read_chamber_image_frame(
     ip_address: str,
     access_code: str,
     timeout: float = 10.0,
+    *,
+    serial: str | None = None,
 ) -> bytes | None:
     """Read a single JPEG frame from the chamber image protocol.
 
@@ -469,12 +472,13 @@ async def read_chamber_image_frame(
         ip_address: Printer IP address
         access_code: Printer access code
         timeout: Connection timeout in seconds
+        serial: The printer's saved serial, checked against its certificate
 
     Returns:
         JPEG image data or None if failed
     """
     port = 6000
-    ssl_context = _create_ssl_context()
+    ssl_context = _create_ssl_context(serial)
 
     try:
         # Connect with SSL
@@ -532,6 +536,10 @@ async def read_chamber_image_frame(
     except ConnectionRefusedError:
         logger.error("Chamber image: connection refused by %s:%s", ip_address, port)
         return None
+    except PrinterCertificateError:
+        # printer_tls has logged why, once per window; a traceback on every
+        # poll would add nothing to it.
+        return None
     except Exception as e:
         logger.exception("Chamber image: error connecting to %s:%s: %s", ip_address, port, e)
         return None
@@ -541,13 +549,16 @@ async def generate_chamber_image_stream(
     ip_address: str,
     access_code: str,
     fps: int = 5,
+    *,
+    serial: str | None = None,
 ) -> asyncio.StreamReader | None:
     """Create a persistent connection for streaming chamber images.
 
+    ``serial`` is the printer's saved serial, checked against its certificate.
     Returns a connected reader or None if connection failed.
     """
     port = 6000
-    ssl_context = _create_ssl_context()
+    ssl_context = _create_ssl_context(serial)
 
     try:
         reader, writer = await asyncio.wait_for(
@@ -606,6 +617,8 @@ async def capture_camera_frame(
     model: str | None,
     output_path: Path,
     timeout: int = 30,
+    *,
+    serial: str | None = None,
 ) -> bool:
     """Capture a single frame from the printer's camera stream and save to disk.
 
@@ -624,7 +637,7 @@ async def capture_camera_frame(
     """
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
-    jpeg_data = await capture_camera_frame_bytes(ip_address, access_code, model, timeout)
+    jpeg_data = await capture_camera_frame_bytes(ip_address, access_code, model, timeout, serial=serial)
     if jpeg_data:
         try:
             with open(output_path, "wb") as f:
@@ -674,6 +687,8 @@ async def capture_camera_frame_bytes(
     access_code: str,
     model: str | None,
     timeout: int = 15,
+    *,
+    serial: str | None = None,
 ) -> bytes | None:
     """Capture a single frame and return as JPEG bytes (no disk write).
 
@@ -743,7 +758,9 @@ async def capture_camera_frame_bytes(
     else:
         return None
 
-    task = asyncio.create_task(_capture_camera_frame_bytes_uncoalesced(ip_address, access_code, model, timeout))
+    task = asyncio.create_task(
+        _capture_camera_frame_bytes_uncoalesced(ip_address, access_code, model, timeout, serial=serial)
+    )
     _inflight_captures[ip_address] = task
     task.add_done_callback(functools.partial(_discard_inflight_capture, ip_address))
     # No wait_for here: this caller IS the capture, and the implementation
@@ -760,6 +777,8 @@ async def _capture_camera_frame_bytes_uncoalesced(
     access_code: str,
     model: str | None,
     timeout: int = 15,
+    *,
+    serial: str | None = None,
 ) -> bytes | None:
     """Open a connection and capture one frame. See capture_camera_frame_bytes.
 
@@ -769,12 +788,12 @@ async def _capture_camera_frame_bytes_uncoalesced(
     # Chamber image models: A1/P1 - returns bytes directly
     if is_chamber_image_model(model):
         logger.info("Capturing camera frame bytes from %s using chamber image protocol (model: %s)", ip_address, model)
-        return await read_chamber_image_frame(ip_address, access_code, timeout=float(timeout))
+        return await read_chamber_image_frame(ip_address, access_code, timeout=float(timeout), serial=serial)
 
     # RTSP models: X1/H2/P2 - use ffmpeg piping to stdout
     # TLS proxy avoids GnuTLS compatibility issues with some printer firmwares
     port = get_camera_port(model)
-    proxy_port, proxy_server = await create_tls_proxy(ip_address, port, printer_ssl_context())
+    proxy_port, proxy_server = await create_tls_proxy(ip_address, port, printer_ssl_context(expected_serial=serial))
     camera_url = f"rtsp://bblp:{access_code}@127.0.0.1:{proxy_port}/streaming/live/1"
 
     ffmpeg = get_ffmpeg_path()
@@ -994,6 +1013,8 @@ async def capture_finish_photo(
     model: str | None,
     archive_dir: Path,
     rotation: int = 0,
+    *,
+    serial: str | None = None,
 ) -> str | None:
     """Capture a finish photo and save it to the archive's photos folder.
 
@@ -1027,6 +1048,7 @@ async def capture_finish_photo(
         model=model,
         output_path=output_path,
         timeout=30,
+        serial=serial,
     )
 
     if success:
@@ -1042,6 +1064,8 @@ async def test_camera_connection(
     ip_address: str,
     access_code: str,
     model: str | None,
+    *,
+    serial: str | None = None,
 ) -> dict:
     """Test if the camera stream is accessible.
 
@@ -1061,6 +1085,7 @@ async def test_camera_connection(
             model=model,
             output_path=test_path,
             timeout=15,
+            serial=serial,
         )
 
         if success:

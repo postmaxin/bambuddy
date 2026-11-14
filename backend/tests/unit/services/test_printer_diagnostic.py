@@ -519,6 +519,28 @@ class TestAuthRejectedReason:
         assert self._params(result) == {"reason": "auth_rejected"}
 
 
+class TestFtpsCheckSerial:
+    """The FTPS handshake check expects the printer being diagnosed (#8)."""
+
+    async def test_saved_printer_passes_its_own_serial(self):
+        printer = _printer()
+        printer.serial_number = "01P00SAVED00001"
+        with (
+            _Env(state=_state()),
+            patch(f"{MOD}._check_ftps_tls", new_callable=AsyncMock, return_value="ok") as ftps,
+        ):
+            await run_connection_diagnostic("192.168.1.50", printer=printer)
+        assert ftps.await_args.kwargs["serial"] == "01P00SAVED00001"
+
+    async def test_pre_add_passes_the_typed_serial(self):
+        with (
+            _Env(test_connection_success=True),
+            patch(f"{MOD}._check_ftps_tls", new_callable=AsyncMock, return_value="ok") as ftps,
+        ):
+            await run_connection_diagnostic("192.168.1.50", serial_number="01P00TYPED00001", access_code="right")
+        assert ftps.await_args.kwargs["serial"] == "01P00TYPED00001"
+
+
 class TestPreAddFlow:
     async def test_bad_credentials_fail_mqtt_auth(self):
         with _Env(test_connection_success=False):
@@ -837,7 +859,7 @@ class TestFtpsTlsProbe:
         writer = MagicMock()
         writer.wait_closed = AsyncMock()
         with patch(f"{MOD}.asyncio.open_connection", new_callable=AsyncMock, return_value=(MagicMock(), writer)):
-            assert await _check_ftps_tls("192.168.1.50", "X1C") == "ok"
+            assert await _check_ftps_tls("192.168.1.50", "X1C", serial=None) == "ok"
         writer.close.assert_called_once()
 
     async def test_handshake_failure_on_an_open_port_is_no_tls(self):
@@ -846,17 +868,17 @@ class TestFtpsTlsProbe:
             new_callable=AsyncMock,
             side_effect=ssl.SSLError("[SSL: WRONG_VERSION_NUMBER] wrong version number"),
         ):
-            assert await _check_ftps_tls("192.168.1.50", "P2S") == "no_tls"
+            assert await _check_ftps_tls("192.168.1.50", "P2S", serial=None) == "no_tls"
 
     async def test_refused_connection_is_closed(self):
         with patch(f"{MOD}.asyncio.open_connection", new_callable=AsyncMock, side_effect=ConnectionRefusedError):
-            assert await _check_ftps_tls("192.168.1.50", "X1C") == "closed"
+            assert await _check_ftps_tls("192.168.1.50", "X1C", serial=None) == "closed"
 
     async def test_timeout_is_closed_not_no_tls(self):
         # A printer that is switched off never gets far enough to say anything
         # about TLS — that has to stay the generic "port unreachable" advice.
         with patch(f"{MOD}.asyncio.open_connection", new_callable=AsyncMock, side_effect=TimeoutError):
-            assert await _check_ftps_tls("192.168.1.50", "X1C") == "closed"
+            assert await _check_ftps_tls("192.168.1.50", "X1C", serial=None) == "closed"
 
     async def test_probe_mirrors_the_model_tls_cap(self):
         """The probe must negotiate exactly what the FTP client negotiates.
@@ -875,8 +897,8 @@ class TestFtpsTlsProbe:
             return MagicMock(), writer
 
         with patch(f"{MOD}.asyncio.open_connection", new=_capture):
-            await _check_ftps_tls("192.168.1.50", "P2S")
-            await _check_ftps_tls("192.168.1.50", "X1C")
+            await _check_ftps_tls("192.168.1.50", "P2S", serial=None)
+            await _check_ftps_tls("192.168.1.50", "X1C", serial=None)
 
         capped, uncapped = contexts
         assert capped.maximum_version == ssl.TLSVersion.TLSv1_2

@@ -1635,6 +1635,9 @@ class VirtualPrinterInstance:
 
         self._proxy = SlicerProxyManager(
             target_host=self.target_printer_ip,
+            # The target printer's saved serial, so the proxy forwards the
+            # slicer's credentials only to that printer (printer_tls).
+            target_serial=self.target_printer_serial or None,
             cert_path=cert_path,
             key_path=key_path,
             on_activity=lambda n, m: logger.info("[VP %s] Proxy %s: %s", self.name, n, m),

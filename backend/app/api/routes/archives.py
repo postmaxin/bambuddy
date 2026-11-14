@@ -3224,6 +3224,7 @@ async def get_archive_printer_media(
                 timelapse_dir,
                 timeout=_PRINTER_MEDIA_LIST_TIMEOUT_SECONDS,
                 printer_model=printer.model,
+                serial=printer.serial_number,
             )
             any_timelapse_directory_available |= listing.available
             candidates = [
@@ -3270,6 +3271,7 @@ async def get_archive_printer_media(
         "/ipcam",
         timeout=_PRINTER_MEDIA_LIST_TIMEOUT_SECONDS,
         printer_model=printer.model,
+        serial=printer.serial_number,
     )
     if ipcam_listing.available:
         for file in match_ipcam_chunks(ipcam_listing.files, archive.started_at, archive.completed_at):
@@ -3486,7 +3488,11 @@ async def scan_timelapse(
             break
         try:
             files = await list_files_async(
-                printer.ip_address, printer.access_code, timelapse_path, printer_model=printer.model
+                printer.ip_address,
+                printer.access_code,
+                timelapse_path,
+                printer_model=printer.model,
+                serial=printer.serial_number,
             )
             if files:
                 break
@@ -3649,6 +3655,7 @@ async def scan_timelapse(
                 retry_delay=ftp_retry_delay,
                 operation_name=f"Download timelapse {matching_file['name']}",
                 cooloff_ip=printer.ip_address,
+                serial=printer.serial_number,
             )
         else:
             timelapse_data = await download_file_bytes_async(
@@ -3658,6 +3665,7 @@ async def scan_timelapse(
                 socket_timeout=ftp_timeout,
                 printer_model=printer.model,
                 expected_size=matching_file.get("size"),
+                serial=printer.serial_number,
             )
     except DownloadDeadlineExceeded as exc:
         # Not retried: the deadline already fitted the file's size.
@@ -3675,6 +3683,7 @@ async def scan_timelapse(
         remote_path,
         len(timelapse_data),
         printer_model=printer.model,
+        serial=printer.serial_number,
     ):
         raise HTTPException(409, "The printer is still writing this video — try again in a moment")
 
@@ -3694,6 +3703,7 @@ async def scan_timelapse(
         verified=matching_file.get("size") is not None,
         printer_model=printer.model,
         printer_name=printer.name,
+        serial=printer.serial_number,
     )
 
     return {
@@ -3748,7 +3758,11 @@ async def select_timelapse(
     for timelapse_dir in ["/timelapse", "/timelapse/video", "/record", "/recording"]:
         try:
             files = await list_files_async(
-                printer.ip_address, printer.access_code, timelapse_dir, printer_model=printer.model
+                printer.ip_address,
+                printer.access_code,
+                timelapse_dir,
+                printer_model=printer.model,
+                serial=printer.serial_number,
             )
             for f in files:
                 if f.get("name") == filename:
@@ -3780,6 +3794,7 @@ async def select_timelapse(
                 retry_delay=ftp_retry_delay,
                 operation_name=f"Download timelapse {filename}",
                 cooloff_ip=printer.ip_address,
+                serial=printer.serial_number,
             )
         else:
             timelapse_data = await download_file_bytes_async(
@@ -3789,6 +3804,7 @@ async def select_timelapse(
                 socket_timeout=ftp_timeout,
                 printer_model=printer.model,
                 expected_size=expected_size,
+                serial=printer.serial_number,
             )
     except DownloadDeadlineExceeded as exc:
         # Not retried: the deadline already fitted the file's size.
@@ -3806,6 +3822,7 @@ async def select_timelapse(
         remote_path,
         len(timelapse_data),
         printer_model=printer.model,
+        serial=printer.serial_number,
     ):
         raise HTTPException(409, "The printer is still writing this video — try again in a moment")
 
@@ -3824,6 +3841,7 @@ async def select_timelapse(
         verified=expected_size is not None,
         printer_model=printer.model,
         printer_name=printer.name,
+        serial=printer.serial_number,
     )
 
     return {

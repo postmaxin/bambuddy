@@ -296,7 +296,7 @@ class FileListResult:
 # Listings still running, by printer and folder: a refresh joins the one in
 # progress instead of starting another thread, which ftplib cannot cancel and
 # which would otherwise pile up in the shared FTP pool (TO-C13).
-_inflight_listings: dict[tuple[str, str, str], tuple[asyncio.Future, threading.Event]] = {}
+_inflight_listings: dict[tuple[str, str, str | None, str], tuple[asyncio.Future, threading.Event]] = {}
 
 
 class DeleteResult(Enum):
@@ -532,12 +532,20 @@ class ImplicitFTP_TLS(FTP_TLS):
     01.02.00.00 needs this — see :mod:`ftp_profiles` and #1401).
     """
 
-    def __init__(self, *args, skip_session_reuse: bool = False, cap_tls_v1_2: bool = False, **kwargs):
+    def __init__(
+        self,
+        *args,
+        serial: str | None,
+        skip_session_reuse: bool = False,
+        cap_tls_v1_2: bool = False,
+        **kwargs,
+    ):
         super().__init__(*args, **kwargs)
         self._sock = None
         self.skip_session_reuse = skip_session_reuse
-        # Verifies the printer before USER/PASS go out (see printer_tls).
-        self.ssl_context = printer_ssl_context()
+        # Verifies the printer, and that it is the one with this serial, before
+        # USER/PASS go out (see printer_tls).
+        self.ssl_context = printer_ssl_context(expected_serial=serial)
         # A new context (``create_default_context()`` too) does NOT guarantee a
         # protocol floor: it leaves ``minimum_version`` at ``MINIMUM_SUPPORTED``, and what that
         # resolves to is a property of the OpenSSL build, not of this code.
@@ -632,8 +640,14 @@ class BambuFTPClient:
         force_prot_c: bool = False,
         respect_handshake_cooloff: bool = True,
         records_handshake_cooloff: bool = True,
+        *,
+        serial: str | None = None,
     ):
-        """Set ``respect_handshake_cooloff=False`` for bounded, user-initiated work.
+        """``serial`` is the saved printer's serial number: the printer's
+        certificate must carry it before the access code is sent (printer_tls).
+        Every caller in the app passes it; ``None`` checks the chain alone.
+
+        Set ``respect_handshake_cooloff=False`` for bounded, user-initiated work.
 
         The cool-off exists to stop an unbounded sweep re-running one doomed
         handshake a hundred times over (#2780). Dispatching a print is not
@@ -653,6 +667,7 @@ class BambuFTPClient:
         self.access_code = access_code
         self.timeout = timeout if timeout is not None else self.DEFAULT_TIMEOUT
         self.printer_model = printer_model
+        self.serial = serial
         self.force_prot_c = force_prot_c
         self.respect_handshake_cooloff = respect_handshake_cooloff
         self.records_handshake_cooloff = records_handshake_cooloff
@@ -761,6 +776,7 @@ class BambuFTPClient:
                 f"cap_tls_v1_2={profile.cap_tls_v1_2})"
             )
             self._ftp = ImplicitFTP_TLS(
+                serial=self.serial,
                 skip_session_reuse=use_prot_c,
                 cap_tls_v1_2=profile.cap_tls_v1_2,
             )
@@ -1492,6 +1508,7 @@ def _size_on_new_connection(client: BambuFTPClient, remote_path: str) -> int | N
         client.access_code,
         timeout=client.timeout,
         printer_model=client.printer_model,
+        serial=client.serial,
         force_prot_c=client.force_prot_c,
         # A second session while the first still waits for its reply may be
         # refused (the printer's connection slots); that must not block the
@@ -1705,6 +1722,8 @@ async def download_file_async(
     min_free_bytes: int | None = None,
     serialize: bool = True,
     max_total_timeout: float = _DOWNLOAD_MAX_TIMEOUT,
+    *,
+    serial: str | None = None,
 ) -> bool:
     """Async wrapper for downloading a file with timeout.
 
@@ -1773,6 +1792,7 @@ async def download_file_async(
                 timeout=socket_timeout,
                 printer_model=printer_model,
                 force_prot_c=force_prot_c,
+                serial=serial,
             )
             if client.connect():
                 try:
@@ -1923,6 +1943,8 @@ async def download_file_try_paths_async(
     printer_model: str | None = None,
     timeout: float = 90.0,
     max_total_timeout: float | None = None,
+    *,
+    serial: str | None = None,
 ) -> str | None:
     """Try downloading a file from multiple paths using a single connection.
 
@@ -1965,7 +1987,9 @@ async def download_file_try_paths_async(
 
     def _download():
         try:
-            client = BambuFTPClient(ip_address, access_code, timeout=socket_timeout, printer_model=printer_model)
+            client = BambuFTPClient(
+                ip_address, access_code, timeout=socket_timeout, printer_model=printer_model, serial=serial
+            )
             if not client.connect():
                 return None
 
@@ -2079,6 +2103,8 @@ async def upload_file_async(
     printer_model: str | None = None,
     respect_handshake_cooloff: bool = True,
     failure: FtpFailureReport | None = None,
+    *,
+    serial: str | None = None,
 ) -> bool:
     """Async wrapper for uploading a file with timeout and progress callback.
 
@@ -2131,6 +2157,7 @@ async def upload_file_async(
             printer_model=printer_model,
             force_prot_c=force_prot_c,
             respect_handshake_cooloff=respect_handshake_cooloff,
+            serial=serial,
         )
         try:
             if client.connect():
@@ -2235,6 +2262,8 @@ async def list_files_async(
     timeout: float = 30.0,
     socket_timeout: float | None = None,
     printer_model: str | None = None,
+    *,
+    serial: str | None = None,
 ) -> list[dict]:
     """Async wrapper for listing files with timeout.
 
@@ -2245,7 +2274,9 @@ async def list_files_async(
     loop = asyncio.get_event_loop()
 
     def _list():
-        client = BambuFTPClient(ip_address, access_code, timeout=socket_timeout, printer_model=printer_model)
+        client = BambuFTPClient(
+            ip_address, access_code, timeout=socket_timeout, printer_model=printer_model, serial=serial
+        )
         if client.connect():
             try:
                 return client.list_files(path)
@@ -2271,11 +2302,15 @@ async def list_files_result_async(
     timeout: float = 30.0,
     socket_timeout: float | None = None,
     printer_model: str | None = None,
+    *,
+    serial: str | None = None,
 ) -> FileListResult:
     """List a directory without collapsing transport failure into empty."""
 
     loop = asyncio.get_event_loop()
-    key = (ip_address, access_code, path)
+    # The serial is part of the key: a listing only answers callers that
+    # expect the same printer behind the certificate.
+    key = (ip_address, access_code, serial, path)
     running = _inflight_listings.get(key)
     if running is None or running[0].done():
         # Set once the printer has answered: only then is a timeout a slow
@@ -2283,7 +2318,9 @@ async def list_files_result_async(
         connected = threading.Event()
 
         def _list() -> FileListResult:
-            client = BambuFTPClient(ip_address, access_code, timeout=socket_timeout, printer_model=printer_model)
+            client = BambuFTPClient(
+                ip_address, access_code, timeout=socket_timeout, printer_model=printer_model, serial=serial
+            )
             if not client.connect():
                 return FileListResult(files=[], available=False)
             connected.set()
@@ -2299,7 +2336,7 @@ async def list_files_result_async(
         running = (loop.run_in_executor(_ftp_executor, _list), connected)
         _inflight_listings[key] = running
 
-        def _forget(done: asyncio.Future, key: tuple[str, str, str] = key) -> None:
+        def _forget(done: asyncio.Future, key: tuple[str, str, str | None, str] = key) -> None:
             entry = _inflight_listings.get(key)
             if entry is not None and entry[0] is done:
                 del _inflight_listings[key]
@@ -2328,6 +2365,8 @@ async def find_remote_file_async(
     timeout: float = 30.0,
     socket_timeout: float | None = None,
     printer_model: str | None = None,
+    *,
+    serial: str | None = None,
 ) -> str | None:
     """First of *remote_paths* the printer actually has, or None.
 
@@ -2344,7 +2383,9 @@ async def find_remote_file_async(
     loop = asyncio.get_event_loop()
 
     def _find() -> str | None:
-        client = BambuFTPClient(ip_address, access_code, timeout=socket_timeout, printer_model=printer_model)
+        client = BambuFTPClient(
+            ip_address, access_code, timeout=socket_timeout, printer_model=printer_model, serial=serial
+        )
         if not client.connect():
             return None
         try:
@@ -2377,6 +2418,8 @@ async def delete_file_async(
     printer_model: str | None = None,
     timeout: float = 60.0,
     respect_handshake_cooloff: bool = True,
+    *,
+    serial: str | None = None,
 ) -> DeleteResult:
     """Async wrapper for deleting a file.
 
@@ -2403,6 +2446,7 @@ async def delete_file_async(
             timeout=socket_timeout,
             printer_model=printer_model,
             respect_handshake_cooloff=respect_handshake_cooloff,
+            serial=serial,
         )
         if client.connect():
             try:
@@ -2428,6 +2472,8 @@ async def download_file_bytes_async(
     expected_size: int | None = None,
     report_missing: bool = False,
     max_total_timeout: float = _DOWNLOAD_MAX_TIMEOUT,
+    *,
+    serial: str | None = None,
 ) -> bytes | None:
     """Async wrapper for downloading file as bytes.
 
@@ -2468,7 +2514,9 @@ async def download_file_bytes_async(
     def _download():
         if cancel.is_set():
             return None
-        client = BambuFTPClient(ip_address, access_code, timeout=socket_timeout, printer_model=printer_model)
+        client = BambuFTPClient(
+            ip_address, access_code, timeout=socket_timeout, printer_model=printer_model, serial=serial
+        )
         if client.connect():
             try:
                 return client.download_file(
@@ -2542,6 +2590,7 @@ async def remote_file_settled(
     downloaded_bytes: int,
     *,
     printer_model: str | None = None,
+    serial: str | None = None,
 ) -> bool:
     """Confirm the printer has finished writing the file we just downloaded.
 
@@ -2564,7 +2613,9 @@ async def remote_file_settled(
     delete".
     """
     directory, _, name = remote_path.rpartition("/")
-    files = await list_files_async(ip_address, access_code, directory or "/", printer_model=printer_model)
+    files = await list_files_async(
+        ip_address, access_code, directory or "/", printer_model=printer_model, serial=serial
+    )
     if not files:
         logger.warning("[TIMELAPSE] Could not re-list %s to confirm %s is complete", directory or "/", name)
         return False
@@ -2596,6 +2647,7 @@ async def delete_archived_timelapse(
     verified: bool,
     printer_model: str | None = None,
     printer_name: str = "",
+    serial: str | None = None,
 ) -> bool:
     """Remove a timelapse from the printer once it is safely in the archive.
 
@@ -2627,7 +2679,9 @@ async def delete_archived_timelapse(
 
     for attempt in range(1, 4):
         try:
-            result = await delete_file_async(ip_address, access_code, remote_path, printer_model=printer_model)
+            result = await delete_file_async(
+                ip_address, access_code, remote_path, printer_model=printer_model, serial=serial
+            )
         except Exception as e:
             result = DeleteResult.FAILED
             logger.warning("[TIMELAPSE] Delete attempt %d/3 raised for %s: %s", attempt, remote_path, e)
@@ -2656,6 +2710,8 @@ async def get_storage_info_async(
     socket_timeout: float | None = None,
     printer_model: str | None = None,
     timeout: float = 60.0,
+    *,
+    serial: str | None = None,
 ) -> dict | None:
     """Async wrapper for getting storage info.
 
@@ -2668,7 +2724,9 @@ async def get_storage_info_async(
     loop = asyncio.get_event_loop()
 
     def _get_storage():
-        client = BambuFTPClient(ip_address, access_code, timeout=socket_timeout, printer_model=printer_model)
+        client = BambuFTPClient(
+            ip_address, access_code, timeout=socket_timeout, printer_model=printer_model, serial=serial
+        )
         if client.connect():
             try:
                 return client.get_storage_info()

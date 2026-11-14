@@ -9539,6 +9539,7 @@ class PrintScheduler:
                 # and the upload's four attempts were then spent against it
                 # without a socket being opened.
                 respect_handshake_cooloff=False,
+                serial=printer.serial_number,
             )
             logger.debug("Queue item %s: Delete result: %s", item.id, delete_result)
         except Exception as e:
@@ -9590,6 +9591,7 @@ class PrintScheduler:
                     max_retries=ftp_retry_count,
                     retry_delay=ftp_retry_delay,
                     operation_name=f"Upload print to {printer.name}",
+                    serial=printer.serial_number,
                 )
             else:
                 uploaded = await upload_file_async(
@@ -9602,6 +9604,7 @@ class PrintScheduler:
                     progress_callback=progress_bridge,
                     respect_handshake_cooloff=False,
                     failure=upload_failure,
+                    serial=printer.serial_number,
                 )
         except UploadCancelled as e:
             uploaded = False
@@ -9770,6 +9773,7 @@ class PrintScheduler:
                     remote_path,
                     socket_timeout=ftp_timeout,
                     printer_model=printer.model,
+                    serial=printer.serial_number,
                 )
             except Exception as cleanup_err:
                 logger.debug(
@@ -9914,6 +9918,7 @@ class PrintScheduler:
                             printer.access_code,
                             remote_path,
                             printer_model=printer.model,
+                            serial=printer.serial_number,
                         )
                     except Exception:
                         pass  # Best-effort — don't fail the error handler
@@ -10178,6 +10183,7 @@ class PrintScheduler:
                     printer.access_code,
                     remote_path,
                     printer_model=printer.model,
+                    serial=printer.serial_number,
                 )
             except Exception:
                 pass  # Best-effort — don't fail the error handler
