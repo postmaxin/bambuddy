@@ -411,6 +411,21 @@ class TestPlateHoldDoesNotGateDrying:
     @pytest.mark.asyncio
     @patch("backend.app.services.print_scheduler.printer_manager")
     @patch("backend.app.services.print_scheduler.supports_drying", return_value=True)
+    async def test_restricted_printer_gets_no_new_drying_command(self, mock_sd, mock_pm, scheduler):
+        """A cloud-mode printer answers an unsigned drying command with an HMS alert."""
+        mock_pm.get_status.return_value = self._finished_printer_state()
+        mock_pm.is_connected.return_value = True
+        mock_pm.get_model.return_value = "P2S"
+        mock_pm.get_client.return_value.accepts_unsigned_commands.return_value = False
+        scheduler._is_printer_idle = MagicMock(return_value=True)
+
+        await scheduler._check_auto_drying(self._db(), [], set())
+
+        mock_pm.send_drying_command.assert_not_called()
+
+    @pytest.mark.asyncio
+    @patch("backend.app.services.print_scheduler.printer_manager")
+    @patch("backend.app.services.print_scheduler.supports_drying", return_value=True)
     async def test_idleness_is_judged_without_the_plate_gate(self, mock_sd, mock_pm, scheduler):
         mock_pm.get_status.return_value = self._finished_printer_state()
         mock_pm.is_connected.return_value = True

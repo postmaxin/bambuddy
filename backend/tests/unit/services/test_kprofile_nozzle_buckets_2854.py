@@ -326,6 +326,29 @@ class TestPrimeKProfileTable:
         assert [call.kwargs["nozzle_diameter"] for call in client.get_kprofiles.await_args_list] == ["0.4", "0.6"]
 
     @pytest.mark.asyncio
+    async def test_restricted_printer_is_sent_nothing(self):
+        """A cloud-mode printer rejects extrusion_cali_get with HMS 0500050000010007."""
+        client = MagicMock()
+        client.accepts_unsigned_commands.return_value = False
+        client.get_kprofiles = AsyncMock(return_value=[])
+
+        primed = await self._prime(self._printer_state(nozzles=("0.4", "0.6")), client)
+
+        assert primed == 0
+        client.get_kprofiles.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_unrestricted_printer_is_primed_as_before(self):
+        client = MagicMock()
+        client.accepts_unsigned_commands.return_value = True
+        client.get_kprofiles = AsyncMock(return_value=[])
+
+        primed = await self._prime(self._printer_state(nozzles=("0.4",)), client)
+
+        assert primed == 1
+        client.get_kprofiles.assert_awaited_once()
+
+    @pytest.mark.asyncio
     async def test_two_identical_nozzles_are_asked_for_once(self):
         client = MagicMock()
         client.get_kprofiles = AsyncMock(return_value=[])

@@ -282,7 +282,7 @@ class GitHubBackupService:
                 try:
                     # Collect backup data
                     self._backup_progress = "Collecting profiles..."
-                    backup_data = await self._collect_backup_data(db, config)
+                    backup_data = await self._collect_backup_data(db, config, trigger=trigger)
 
                     if not backup_data:
                         # No data to backup
@@ -359,7 +359,7 @@ class GitHubBackupService:
             self._running_backup = False
             self._backup_progress = None
 
-    async def _collect_backup_data(self, db: AsyncSession, config: GitHubBackupConfig) -> dict:
+    async def _collect_backup_data(self, db: AsyncSession, config: GitHubBackupConfig, trigger: str = "manual") -> dict:
         """Collect data to backup based on config settings.
 
         Returns dict with structure:
@@ -393,7 +393,7 @@ class GitHubBackupService:
         # Collect K-profiles from all connected printers
         if config.backup_kprofiles:
             self._backup_progress = "Collecting K-profiles from printers..."
-            await self._collect_kprofiles(db, files)
+            await self._collect_kprofiles(db, files, trigger=trigger)
 
         # Collect cloud profiles. `contents.cloud_profiles` is corrected below
         # from what was configured to what was actually written — it claimed
@@ -427,7 +427,7 @@ class GitHubBackupService:
 
         return files
 
-    async def _collect_kprofiles(self, db: AsyncSession, files: dict):
+    async def _collect_kprofiles(self, db: AsyncSession, files: dict, trigger: str = "manual"):
         """Collect K-profiles from all connected printers."""
         result = await db.execute(select(Printer).where(Printer.is_active == True))  # noqa: E712
         printers = result.scalars().all()
@@ -437,6 +437,11 @@ class GitHubBackupService:
         for printer in printers:
             client = printer_manager.get_client(printer.id)
             if not client or not client.state.connected:
+                continue
+            if trigger == "scheduled" and not client.accepts_unsigned_commands():
+                # Unprompted run: extrusion_cali_get would raise an HMS alert on a
+                # cloud-mode printer. A manual backup is the user's call and still asks.
+                logger.info("Skipping K-profile backup for %s: printer rejects unsigned MQTT commands", printer.name)
                 continue
 
             serial = printer.serial_number

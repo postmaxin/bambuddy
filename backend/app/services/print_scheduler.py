@@ -6659,6 +6659,15 @@ class PrintScheduler:
                 if mid_print:
                     temp = max(40, temp - 5)
 
+                # Unprompted command: a cloud-mode printer answers it with an HMS alert.
+                # Only new starts are gated; stop handling and bookkeeping stay reachable.
+                drying_client = printer_manager.get_client(pid)
+                if drying_client is not None and not drying_client.accepts_unsigned_commands():
+                    logger.debug(
+                        "Auto-drying: printer %d AMS %d skipped — printer rejects unsigned MQTT commands", pid, ams_id
+                    )
+                    continue
+
                 # Start drying
                 logger.info(
                     "Auto-drying: printer %d AMS %d — humidity %d%% > threshold %d%%, "

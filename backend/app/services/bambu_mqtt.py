@@ -6387,6 +6387,15 @@ class BambuMQTTClient:
             return (self._fun_value & 0x20000000) != 0
         return self._flag3_value is not None and (self._flag3_value & 0x10) != 0
 
+    def accepts_unsigned_commands(self) -> bool:
+        """Public verdict for unprompted senders: False when the printer rejects unsigned commands.
+
+        Background code (startup priming, schedulers, periodic backups) must not
+        send a command a cloud-mode printer will refuse: the refusal surfaces as
+        a visible HMS alert on the printer. User-initiated routes are unaffected.
+        """
+        return not self._unsigned_commands_rejected()
+
     def _update_signature_requirement(self, data: dict) -> None:
         """Record the "fun" / "flag3" values a report carries; omitted fields keep their last value."""
         fun = data.get("fun")
