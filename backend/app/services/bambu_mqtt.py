@@ -2178,20 +2178,10 @@ class BambuMQTTClient:
             # Dropping is silent (no failure event) on purpose.
             self._pending_assignments.clear()
             client.subscribe(self.topic_subscribe)
-            # Subscribe to request topic for ams_mapping capture (if supported by broker)
-            if self._request_topic_supported and not self._unsigned_commands_rejected():
-                result, mid = client.subscribe(self.topic_publish)
-                if result == mqtt.MQTT_ERR_SUCCESS:
-                    self._request_topic_sub_mid = mid
-                    self._request_topic_sub_time = time.time()
-                    self._request_topic_confirmed = False
-                else:
-                    logger.warning(
-                        "[%s] Failed to send request topic subscription",
-                        self.serial_number,
-                    )
-                    self._request_topic_supported = False
-                    BambuMQTTClient._request_topic_cache[self.serial_number] = False
+            # The request-topic subscribe (ams_mapping capture) also waits for the first
+            # full status frame: cloud-mode printers drop the connection on it, and we
+            # only know whether this printer is restricted once that frame arrives
+            # (see _send_deferred_connect_queries).
             # Request full status update (includes nozzle info in push_status response)
             self._request_push_all()
             # The firmware-version and K-profile priming queries are commands, not
@@ -6413,6 +6403,28 @@ class BambuMQTTClient:
         if isinstance(flag3, int):
             self._flag3_value = flag3
 
+    def _subscribe_request_topic(self) -> None:
+        """Subscribe to the request topic for ams_mapping capture, if the broker supports it.
+
+        Only called once the printer is known to accept unsigned commands: a
+        cloud-mode printer drops the connection on this subscribe. An unrestricted
+        printer that still drops is handled by the 2-strike disable in ``_on_disconnect``.
+        """
+        if not self._client or not self._request_topic_supported:
+            return
+        result, mid = self._client.subscribe(self.topic_publish)
+        if result == mqtt.MQTT_ERR_SUCCESS:
+            self._request_topic_sub_mid = mid
+            self._request_topic_sub_time = time.time()
+            self._request_topic_confirmed = False
+        else:
+            logger.warning(
+                "[%s] Failed to send request topic subscription",
+                self.serial_number,
+            )
+            self._request_topic_supported = False
+            BambuMQTTClient._request_topic_cache[self.serial_number] = False
+
     def _send_deferred_connect_queries(self) -> None:
         """Send, or skip, the connect-time queries that are commands.
 
@@ -6429,6 +6441,7 @@ class BambuMQTTClient:
                 self.serial_number,
             )
             return
+        self._subscribe_request_topic()
         self._request_version()
         # Prime K-profile request (Bambu printers often ignore the first request)
         self._prime_kprofile_request()
