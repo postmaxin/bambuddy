@@ -71,6 +71,14 @@ async def test_engine(test_engine, tmp_path):
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
     yield engine
+    # A job still running (polling timed out, an assertion failed) holds a
+    # connection that dispose() would leave open: stop this loop's jobs first.
+    loop = asyncio.get_running_loop()
+    pending = [t for t in slice_dispatch._tasks.values() if not t.done() and t.get_loop() is loop]
+    for task in pending:
+        task.cancel()
+    if pending:
+        await asyncio.wait(pending, timeout=5)
     await engine.dispose()
     await asyncio.sleep(0.1)  # let aiosqlite's worker thread finish before the loop closes
 
