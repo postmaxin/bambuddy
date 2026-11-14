@@ -7385,7 +7385,7 @@ export function SettingsPage() {
           }}
         >
           <Card
-            className="w-full max-w-md"
+            className="w-full max-w-md max-h-[calc(100dvh-2rem)] overflow-y-auto"
             onClick={(e: React.MouseEvent) => e.stopPropagation()}
           >
             <CardHeader>
@@ -7604,7 +7604,7 @@ export function SettingsPage() {
           }}
         >
           <Card
-            className="w-full max-w-md"
+            className="w-full max-w-md max-h-[calc(100dvh-2rem)] overflow-y-auto"
             onClick={(e: React.MouseEvent) => e.stopPropagation()}
           >
             <CardHeader>
@@ -7961,7 +7961,7 @@ export function SettingsPage() {
           }}
         >
           <Card
-            className="w-full max-w-md"
+            className="w-full max-w-md max-h-[calc(100dvh-2rem)] overflow-y-auto"
             onClick={(e: React.MouseEvent) => e.stopPropagation()}
           >
             <CardHeader>
