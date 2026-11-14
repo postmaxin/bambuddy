@@ -50,6 +50,16 @@ export default {
       critical: 'Critique',
     },
   },
+  passwordRules: {
+    title: 'Le mot de passe doit contenir :',
+    minLength: 'Au moins 8 caractères',
+    uppercase: 'Une lettre majuscule',
+    lowercase: 'Une lettre minuscule',
+    digit: 'Un chiffre',
+    special: 'Un caractère spécial',
+    met: 'Respecté',
+    unmet: 'Non respecté',
+  },
   common: {
     secretKept: 'Enregistré. Laissez tel quel pour le conserver, ou saisissez une nouvelle valeur.',
     secretReenter: "L'adresse a changé : saisissez-le à nouveau. Rien n'est enregistré avant cela.",
@@ -2593,7 +2603,6 @@ export default {
     enterUsername: 'Entrez l\'utilisateur',
     password: 'Mot de passe',
     enterPassword: 'Entrez le mot de passe',
-    passwordRequirements: 'Au moins 8 caractères, avec une majuscule, une minuscule, un chiffre et un caractère spécial.',
     confirmPassword: 'Confirmer le mot de passe',
     confirmPasswordPlaceholder: 'Confirmez le mot de passe',
     // Title tooltips
@@ -3580,7 +3589,7 @@ export default {
     currentPassword: 'Mot de passe actuel',
     currentPasswordPlaceholder: 'Entrez mdp actuel',
     newPassword: 'Nouveau mot de passe',
-    newPasswordPlaceholder: 'Nouveau mdp (min 6 char)',
+    newPasswordPlaceholder: 'Nouveau mot de passe',
     confirmPassword: 'Confirmer nouveau mdp',
     confirmPasswordPlaceholder: 'Confirmez nouveau mdp',
     passwordsDoNotMatch: 'Les mots de passe ne correspondent pas',

@@ -47,6 +47,16 @@ export default {
       critical: '긴급',
     },
   },
+  passwordRules: {
+    title: '비밀번호 조건:',
+    minLength: '8자 이상',
+    uppercase: '대문자',
+    lowercase: '소문자',
+    digit: '숫자',
+    special: '특수문자',
+    met: '충족됨',
+    unmet: '충족되지 않음',
+  },
   common: {
     secretKept: '저장되어 있습니다. 그대로 두면 유지되고, 새 값을 입력하면 바뀝니다.',
     secretReenter: '주소가 변경되었습니다. 다시 입력하세요. 입력할 때까지 저장되지 않습니다.',
@@ -3052,7 +3062,6 @@ export default {
     sendNotifications: '알림 보내기',
     sendNotificationsDescription: '이 키가 연결된 앱의 메시지를 받는 알림 채널을 통해 메시지를 보내고(POST /notifications/app-message), 해당 앱을 가리키는 사이드바 링크에 숫자를 표시할 수 있도록 허용합니다(PUT /external-links/badge). Bambuddy Orders 같은 앱용입니다. 그 외에는 없으며, 키로 채널이나 링크를 읽거나 변경할 수 없습니다.',
     sendNotificationsBadge: '알림',
-    passwordRequirements: '최소 8자, 대문자, 소문자, 숫자, 특수문자 각 1개 이상 포함',
 
     pipelineLimits: {
       title: '슬라이서 파이프라인 한도',
@@ -3427,7 +3436,7 @@ export default {
     currentPassword: '현재 비밀번호',
     currentPasswordPlaceholder: '현재 비밀번호 입력',
     newPassword: '새 비밀번호',
-    newPasswordPlaceholder: '새 비밀번호 입력 (최소 6자)',
+    newPasswordPlaceholder: '새 비밀번호 입력',
     confirmPassword: '새 비밀번호 확인',
     confirmPasswordPlaceholder: '새 비밀번호 확인',
     passwordsDoNotMatch: '비밀번호가 일치하지 않습니다',

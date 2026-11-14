@@ -50,6 +50,16 @@ export default {
       critical: 'Kritik',
     },
   },
+  passwordRules: {
+    title: 'Parola şunları içermeli:',
+    minLength: 'En az 8 karakter',
+    uppercase: 'Bir büyük harf',
+    lowercase: 'Bir küçük harf',
+    digit: 'Bir rakam',
+    special: 'Bir özel karakter',
+    met: 'Karşılandı',
+    unmet: 'Karşılanmadı',
+  },
   common: {
     secretKept: 'Kaydedildi. Korumak için olduğu gibi bırakın veya yeni bir değer girin.',
     secretReenter: 'Adres değişti: tekrar girin. Siz girene kadar hiçbir şey kaydedilmez.',
@@ -2642,7 +2652,6 @@ export default {
     enterUsername: 'Kullanıcı adı girin',
     password: 'Parola',
     enterPassword: 'Parola girin',
-    passwordRequirements: 'En az 8 karakter, bir büyük harf, bir küçük harf, bir rakam ve bir özel karakter ile.',
     confirmPassword: 'Parolayı Onayla',
     confirmPasswordPlaceholder: 'Parolayı onayla',
     // Başlık ipuçları
@@ -3595,7 +3604,7 @@ export default {
     currentPassword: 'Mevcut Parola',
     currentPasswordPlaceholder: 'Mevcut parolayı girin',
     newPassword: 'Yeni Parola',
-    newPasswordPlaceholder: 'Yeni parolayı girin (en az 6 karakter)',
+    newPasswordPlaceholder: 'Yeni parola girin',
     confirmPassword: 'Yeni Parolayı Onayla',
     confirmPasswordPlaceholder: 'Yeni parolayı onayla',
     passwordsDoNotMatch: 'Parolalar eşleşmiyor',

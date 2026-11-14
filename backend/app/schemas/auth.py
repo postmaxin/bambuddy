@@ -2,24 +2,53 @@ import re
 from typing import Literal
 
 from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic_core import PydanticCustomError
 
 from backend.app.schemas.not_null import IgnoresNullForRequiredColumns
+
+PASSWORD_MIN_LENGTH = 8
+
+# (code, human-readable text). The codes are the contract with the frontend
+# (`ctx.rules` on the 422 entry); the text only feeds the readable message.
+_PASSWORD_RULES: tuple[tuple[str, str, re.Pattern[str] | None], ...] = (
+    ("min_length", f"be at least {PASSWORD_MIN_LENGTH} characters", None),
+    ("uppercase", "contain an uppercase letter", re.compile(r"[A-Z]")),
+    ("lowercase", "contain a lowercase letter", re.compile(r"[a-z]")),
+    ("digit", "contain a digit", re.compile(r"\d")),
+    ("special", "contain a special character", re.compile(r"[^A-Za-z0-9]")),
+)
+
+
+def unmet_password_rules(v: str) -> list[str]:
+    """Codes of every password rule `v` fails, in display order."""
+    unmet: list[str] = []
+    for code, _text, pattern in _PASSWORD_RULES:
+        ok = len(v) >= PASSWORD_MIN_LENGTH if pattern is None else pattern.search(v) is not None
+        if not ok:
+            unmet.append(code)
+    return unmet
+
+
+def password_complexity_message(unmet: list[str]) -> str:
+    texts = [text for code, text, _ in _PASSWORD_RULES if code in unmet]
+    return "Password must " + ", ".join(texts[:-1]) + (" and " if len(texts) > 1 else "") + texts[-1]
 
 
 def _validate_password_complexity(v: str) -> str:
     """Enforce minimum password complexity (M-C).
 
-    Requires at least one uppercase letter, one lowercase letter, one digit,
-    and one special character in addition to the min_length=8 Field constraint.
+    Requires length >= 8, an uppercase letter, a lowercase letter, a digit and
+    a special character. Reports EVERY unmet rule at once: the message is
+    readable for API clients, and the 422 entry carries the codes in
+    `ctx.rules` (type `password_complexity`) so the UI can map them to keys.
     """
-    if not re.search(r"[A-Z]", v):
-        raise ValueError("Password must contain at least one uppercase letter")
-    if not re.search(r"[a-z]", v):
-        raise ValueError("Password must contain at least one lowercase letter")
-    if not re.search(r"\d", v):
-        raise ValueError("Password must contain at least one digit")
-    if not re.search(r"[^A-Za-z0-9]", v):
-        raise ValueError("Password must contain at least one special character")
+    unmet = unmet_password_rules(v)
+    if unmet:
+        raise PydanticCustomError(
+            "password_complexity",
+            "{message}",
+            {"message": password_complexity_message(unmet), "rules": unmet},
+        )
     return v
 
 
@@ -147,7 +176,7 @@ class LDAPProvisionRequest(BaseModel):
 
 class ChangePasswordRequest(BaseModel):
     current_password: str = Field(..., max_length=256)  # M-NEW-3: cap before pbkdf2
-    new_password: str = Field(..., min_length=8, max_length=256)
+    new_password: str = Field(..., max_length=256)  # length is a complexity rule
 
     @field_validator("new_password")
     @classmethod
@@ -178,7 +207,7 @@ class ForgotPasswordRequest(BaseModel):
 
 class ForgotPasswordConfirmRequest(BaseModel):
     token: str = Field(..., max_length=128)
-    new_password: str = Field(..., min_length=8, max_length=256)
+    new_password: str = Field(..., max_length=256)  # length is a complexity rule
 
     @field_validator("new_password")
     @classmethod

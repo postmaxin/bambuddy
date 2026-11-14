@@ -50,6 +50,16 @@ export default {
       critical: '紧急',
     },
   },
+  passwordRules: {
+    title: '密码需包含：',
+    minLength: '至少 8 个字符',
+    uppercase: '一个大写字母',
+    lowercase: '一个小写字母',
+    digit: '一个数字',
+    special: '一个特殊字符',
+    met: '已满足',
+    unmet: '未满足',
+  },
   common: {
     secretKept: '已保存。保持不变即可保留，或输入新值。',
     secretReenter: '地址已更改：请重新输入。在此之前不会保存任何内容。',
@@ -2638,7 +2648,6 @@ export default {
     enterUsername: '输入用户名',
     password: '密码',
     enterPassword: '输入密码',
-    passwordRequirements: '至少 8 个字符，包含一个大写、一个小写、一个数字和一个特殊字符。',
     confirmPassword: '确认密码',
     confirmPasswordPlaceholder: '确认密码',
     // Title tooltips
@@ -3579,7 +3588,7 @@ export default {
     currentPassword: '当前密码',
     currentPasswordPlaceholder: '输入当前密码',
     newPassword: '新密码',
-    newPasswordPlaceholder: '输入新密码（至少 6 个字符）',
+    newPasswordPlaceholder: '输入新密码',
     confirmPassword: '确认新密码',
     confirmPasswordPlaceholder: '确认新密码',
     passwordsDoNotMatch: '密码不匹配',

@@ -50,6 +50,16 @@ export default {
       critical: 'Kritisch',
     },
   },
+  passwordRules: {
+    title: 'Das Passwort braucht:',
+    minLength: 'Mindestens 8 Zeichen',
+    uppercase: 'Einen Großbuchstaben',
+    lowercase: 'Einen Kleinbuchstaben',
+    digit: 'Eine Ziffer',
+    special: 'Ein Sonderzeichen',
+    met: 'Erfüllt',
+    unmet: 'Nicht erfüllt',
+  },
   common: {
     secretKept: 'Gespeichert. Unverändert lassen, um es zu behalten, oder einen neuen Wert eingeben.',
     secretReenter: 'Die Adresse hat sich geändert: Bitte erneut eingeben. Bis dahin wird nichts gespeichert.',
@@ -2638,7 +2648,6 @@ export default {
     enterUsername: 'Benutzername eingeben',
     password: 'Passwort',
     enterPassword: 'Passwort eingeben',
-    passwordRequirements: 'Mindestens 8 Zeichen, davon ein Großbuchstabe, ein Kleinbuchstabe, eine Ziffer und ein Sonderzeichen.',
     confirmPassword: 'Passwort bestätigen',
     confirmPasswordPlaceholder: 'Passwort bestätigen',
     // Title tooltips
@@ -3592,7 +3601,7 @@ export default {
     currentPassword: 'Aktuelles Passwort',
     currentPasswordPlaceholder: 'Aktuelles Passwort eingeben',
     newPassword: 'Neues Passwort',
-    newPasswordPlaceholder: 'Neues Passwort eingeben (min. 6 Zeichen)',
+    newPasswordPlaceholder: 'Neues Passwort eingeben',
     confirmPassword: 'Neues Passwort bestätigen',
     confirmPasswordPlaceholder: 'Neues Passwort bestätigen',
     passwordsDoNotMatch: 'Passwörter stimmen nicht überein',

@@ -50,6 +50,16 @@ export default {
       critical: 'Критично',
     },
   },
+  passwordRules: {
+    title: 'Пароль має містити:',
+    minLength: 'Щонайменше 8 символів',
+    uppercase: 'Велику літеру',
+    lowercase: 'Малу літеру',
+    digit: 'Цифру',
+    special: 'Спеціальний символ',
+    met: 'Виконано',
+    unmet: 'Не виконано',
+  },
   common: {
     secretKept: 'Збережено. Залиште як є, щоб зберегти, або введіть нове значення.',
     secretReenter: 'Адресу змінено: введіть значення ще раз. Доти нічого не зберігається.',
@@ -2656,7 +2666,6 @@ export default {
     enterUsername: "Введіть ім’я користувача",
     password: "Пароль",
     enterPassword: "Введіть пароль",
-    passwordRequirements: "Принаймні 8 символів, один великий, один малий, одна цифра та один спеціальний символ.",
     confirmPassword: "Підтвердити пароль",
     confirmPasswordPlaceholder: "Підтвердити пароль",
     // Title tooltips
@@ -3619,7 +3628,7 @@ export default {
     currentPassword: "Поточний пароль",
     currentPasswordPlaceholder: "Введіть поточний пароль",
     newPassword: "Новий пароль",
-    newPasswordPlaceholder: "Введіть новий пароль (мінімум 6 символів)",
+    newPasswordPlaceholder: "Введіть новий пароль",
     confirmPassword: "Підтвердити новий пароль",
     confirmPasswordPlaceholder: "Підтвердити новий пароль",
     passwordsDoNotMatch: "Паролі не збігаються",

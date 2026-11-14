@@ -50,6 +50,16 @@ export default {
       critical: 'Krytyczne',
     },
   },
+  passwordRules: {
+    title: 'Hasło musi zawierać:',
+    minLength: 'Co najmniej 8 znaków',
+    uppercase: 'Wielką literę',
+    lowercase: 'Małą literę',
+    digit: 'Cyfrę',
+    special: 'Znak specjalny',
+    met: 'Spełnione',
+    unmet: 'Niespełnione',
+  },
   common: {
     secretKept: 'Zapisano. Pozostaw bez zmian, aby zachować, lub wpisz nową wartość.',
     secretReenter: 'Adres się zmienił: wpisz go ponownie. Nic nie zostanie zapisane, dopóki tego nie zrobisz.',
@@ -2660,7 +2670,6 @@ export default {
     enterUsername: 'Wprowadź nazwę użytkownika',
     password: 'Hasło',
     enterPassword: 'Wprowadź hasło',
-    passwordRequirements: 'Co najmniej 8 znaków, w tym jedna wielka litera, jedna mała litera, jedna cyfra i jeden znak specjalny.',
     confirmPassword: 'Potwierdź hasło',
     confirmPasswordPlaceholder: 'Potwierdź hasło',
     // Title tooltips
@@ -3624,7 +3633,7 @@ export default {
     currentPassword: 'Obecne hasło',
     currentPasswordPlaceholder: 'Wpisz obecne hasło',
     newPassword: 'Nowe hasło',
-    newPasswordPlaceholder: 'Wpisz nowe hasło (min. 6 znaków)',
+    newPasswordPlaceholder: 'Wprowadź nowe hasło',
     confirmPassword: 'Potwierdź nowe hasło',
     confirmPasswordPlaceholder: 'Potwierdź nowe hasło',
     passwordsDoNotMatch: 'Hasła nie są zgodne',

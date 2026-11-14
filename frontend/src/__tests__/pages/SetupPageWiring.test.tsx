@@ -30,16 +30,36 @@ describe('SetupPage wiring', () => {
 
     await user.click(screen.getByLabelText(/enable authentication/i));
     await user.type(screen.getByLabelText(/admin username/i), 'admin-test');
-    await user.type(screen.getByLabelText(/admin password/i), 'test-password-1');
-    await user.type(screen.getByLabelText(/^confirm password/i), 'test-password-1');
+    await user.type(screen.getByLabelText(/admin password/i), 'Test-Password-1');
+    await user.type(screen.getByLabelText(/^confirm password/i), 'Test-Password-1');
     await user.click(screen.getByRole('button', { name: /complete setup/i }));
 
     await waitFor(() => expect(setup).toHaveBeenCalledTimes(1));
     expect(setup).toHaveBeenCalledWith({
       auth_enabled: true,
       admin_username: 'admin-test',
-      admin_password: 'test-password-1',
+      admin_password: 'Test-Password-1',
     });
+  });
+
+  it('shows every password rule up front and keeps submit disabled until all are met', async () => {
+    const user = userEvent.setup();
+    render(<SetupPage />);
+
+    await user.click(screen.getByLabelText(/enable authentication/i));
+    // Rules are visible before anything is typed.
+    expect(screen.getAllByRole('listitem')).toHaveLength(5);
+
+    const submit = screen.getByRole('button', { name: /complete setup/i });
+    await user.type(screen.getByLabelText(/admin username/i), 'admin-test');
+    await user.type(screen.getByLabelText(/admin password/i), 'abcdefgh');
+    expect(submit).toBeDisabled();
+    expect(screen.getByTestId('password-rule-needsUppercase')).toHaveAttribute('data-met', 'false');
+    expect(screen.getByTestId('password-rule-needsLowercase')).toHaveAttribute('data-met', 'true');
+
+    await user.clear(screen.getByLabelText(/admin password/i));
+    await user.type(screen.getByLabelText(/admin password/i), 'Abcdefg1!');
+    expect(submit).toBeEnabled();
   });
 
   it('mismatched passwords send nothing and show an error', async () => {
@@ -48,8 +68,8 @@ describe('SetupPage wiring', () => {
 
     await user.click(screen.getByLabelText(/enable authentication/i));
     await user.type(screen.getByLabelText(/admin username/i), 'admin-test');
-    await user.type(screen.getByLabelText(/admin password/i), 'test-password-1');
-    await user.type(screen.getByLabelText(/^confirm password/i), 'test-password-2');
+    await user.type(screen.getByLabelText(/admin password/i), 'Test-Password-1');
+    await user.type(screen.getByLabelText(/^confirm password/i), 'Test-Password-2');
     await user.click(screen.getByRole('button', { name: /complete setup/i }));
 
     expect(await screen.findByText(/passwords do not match/i)).toBeInTheDocument();

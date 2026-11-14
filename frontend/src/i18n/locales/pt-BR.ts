@@ -50,6 +50,16 @@ export default {
       critical: 'Crítico',
     },
   },
+  passwordRules: {
+    title: 'A senha deve ter:',
+    minLength: 'Pelo menos 8 caracteres',
+    uppercase: 'Uma letra maiúscula',
+    lowercase: 'Uma letra minúscula',
+    digit: 'Um dígito',
+    special: 'Um caractere especial',
+    met: 'Atendido',
+    unmet: 'Não atendido',
+  },
   common: {
     secretKept: 'Salvo. Deixe como está para mantê-lo ou digite um novo valor.',
     secretReenter: 'O endereço mudou: digite-o novamente. Nada é salvo até você fazer isso.',
@@ -2593,7 +2603,6 @@ export default {
     enterUsername: 'Digite o nome de usuário',
     password: 'Senha',
     enterPassword: 'Digite a senha',
-    passwordRequirements: 'Pelo menos 8 caracteres, com uma maiúscula, uma minúscula, um dígito e um caractere especial.',
     confirmPassword: 'Confirmar Senha',
     confirmPasswordPlaceholder: 'Confirme a senha',
     // Title tooltips
@@ -3579,7 +3588,7 @@ export default {
     currentPassword: 'Senha Atual',
     currentPasswordPlaceholder: 'Digite a senha atual',
     newPassword: 'Nova Senha',
-    newPasswordPlaceholder: 'Digite a nova senha (mínimo 6 caracteres)',
+    newPasswordPlaceholder: 'Digite a nova senha',
     confirmPassword: 'Confirmar Senha',
     confirmPasswordPlaceholder: 'Confirme a nova senha',
     passwordsDoNotMatch: 'As senhas não coincidem',
