@@ -4072,7 +4072,7 @@ class TestOIDCEmailClaimValidation:
     @pytest.mark.integration
     async def test_invalid_claim_name_dot_rejected(self, async_client: AsyncClient):
         """email_claim with a dot (log-injection risk) must be rejected."""
-        admin_token = await _setup_and_login(async_client, "ecv_adm1", "Ecv123!")
+        admin_token = await _setup_and_login(async_client, "ecv_adm1", "Ecv1234!")
         resp = await async_client.post(
             "/api/v1/auth/oidc/providers",
             json={
@@ -4090,7 +4090,7 @@ class TestOIDCEmailClaimValidation:
     @pytest.mark.asyncio
     @pytest.mark.integration
     async def test_invalid_claim_name_starts_with_digit_rejected(self, async_client: AsyncClient):
-        admin_token = await _setup_and_login(async_client, "ecv_adm2", "Ecv123!")
+        admin_token = await _setup_and_login(async_client, "ecv_adm2", "Ecv1234!")
         resp = await async_client.post(
             "/api/v1/auth/oidc/providers",
             json={
@@ -4109,7 +4109,7 @@ class TestOIDCEmailClaimValidation:
     @pytest.mark.integration
     async def test_invalid_claim_name_newline_rejected(self, async_client: AsyncClient):
         """T2 regex-bug guard: re.fullmatch must reject trailing newline."""
-        admin_token = await _setup_and_login(async_client, "ecv_adm3", "Ecv123!")
+        admin_token = await _setup_and_login(async_client, "ecv_adm3", "Ecv1234!")
         resp = await async_client.post(
             "/api/v1/auth/oidc/providers",
             json={
@@ -4128,7 +4128,7 @@ class TestOIDCEmailClaimValidation:
     @pytest.mark.integration
     async def test_claim_name_65_chars_rejected(self, async_client: AsyncClient):
         """email_claim longer than 64 characters must be rejected."""
-        admin_token = await _setup_and_login(async_client, "ecv_adm4", "Ecv123!")
+        admin_token = await _setup_and_login(async_client, "ecv_adm4", "Ecv1234!")
         resp = await async_client.post(
             "/api/v1/auth/oidc/providers",
             json={
@@ -4147,7 +4147,7 @@ class TestOIDCEmailClaimValidation:
     @pytest.mark.integration
     async def test_valid_claim_name_accepted(self, async_client: AsyncClient):
         """Valid claim names like preferred_username and upn must be accepted."""
-        admin_token = await _setup_and_login(async_client, "ecv_adm5", "Ecv123!")
+        admin_token = await _setup_and_login(async_client, "ecv_adm5", "Ecv1234!")
         for claim in ("preferred_username", "upn", "email", "emailAddress"):
             resp = await async_client.post(
                 "/api/v1/auth/oidc/providers",
